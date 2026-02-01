@@ -8,27 +8,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Machorras" />
 <meta name="theme-color" content="#022c22" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
-<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
+<link rel="icon" type="image/jpeg" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
 <title>Torneo Machorras</title>
-
-<!-- Enlace al manifest para PWA -->
-<link rel="manifest" href="manifest.json" />
-
 <script src="https://cdn.tailwindcss.com"></script>
-
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-// Configuración Firebase (se inyecta en entorno)
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-const appId = typeof __app_id !== "undefined" ? __app_id : "torneo-machorras";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 let currentUser = null;
 let localResultados = {};
@@ -37,26 +26,59 @@ let isFirstLoad = true;
 
 const initAuth = async () => {
   try {
-    if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
-      await signInWithCustomToken(auth, __initial_auth_token);
-    } else {
-      await signInAnonymously(auth);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      await supabase.auth.signInAnonymously();
     }
   } catch (error) {
     console.error("Error de auth:", error);
   }
 };
 
-onAuthStateChanged(auth, (user) => {
+const loadResultados = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("resultados")
+      .select("*");
+
+    if (error) throw error;
+
+    const nuevosResultados = {};
+    data.forEach((row) => {
+      const rKey = row.ronda.toString();
+      if (!nuevosResultados[rKey]) nuevosResultados[rKey] = {};
+      nuevosResultados[rKey][row.partido_idx] = row.scores;
+    });
+    localResultados = nuevosResultados;
+    return true;
+  } catch (error) {
+    console.error("Error cargando resultados:", error);
+    return false;
+  }
+};
+
+const subscribeToChanges = () => {
+  supabase
+    .channel("resultados_changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "resultados" },
+      (payload) => {
+        const rKey = payload.new.ronda.toString();
+        if (!localResultados[rKey]) localResultados[rKey] = {};
+        localResultados[rKey][payload.new.partido_idx] = payload.new.scores;
+        refreshCurrentView();
+      }
+    )
+    .subscribe();
+};
+
+supabase.auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
-    const resultsRef = collection(db, "artifacts", appId, "public", "data", "resultados");
-    onSnapshot(resultsRef, (snapshot) => {
-      const nuevosResultados = {};
-      snapshot.forEach((doc) => {
-        nuevosResultados[doc.id] = doc.data().scores;
-      });
-      localResultados = nuevosResultados;
+    const loaded = await loadResultados();
+    if (loaded) {
+      subscribeToChanges();
       if (isFirstLoad) {
         isFirstLoad = false;
         window.initButtons();
@@ -64,7 +86,7 @@ onAuthStateChanged(auth, (user) => {
       } else {
         refreshCurrentView();
       }
-    }, (error) => console.error("Error Firestore:", error));
+    }
   }
 });
 
@@ -77,14 +99,20 @@ const refreshCurrentView = () => {
 
 window.saveScore = async (ronda, partidoIdx, parejaPos, value) => {
   if (!currentUser) return;
-  const rKey = ronda.toString();
   const valInt = (value === "" || value === null || isNaN(value)) ? null : parseInt(value);
+  const rKey = ronda.toString();
   if (!localResultados[rKey]) localResultados[rKey] = {};
   if (!localResultados[rKey][partidoIdx]) localResultados[rKey][partidoIdx] = [null, null];
   localResultados[rKey][partidoIdx][parejaPos] = valInt;
+
   try {
-    const docRef = doc(db, "artifacts", appId, "public", "data", "resultados", rKey);
-    await setDoc(docRef, { scores: localResultados[rKey], updatedAt: Date.now() }, { merge: true });
+    const { error } = await supabase
+      .from("resultados")
+      .upsert(
+        { ronda, partido_idx: partidoIdx, scores: localResultados[rKey][partidoIdx] },
+        { onConflict: "ronda,partido_idx" }
+      );
+    if (error) throw error;
   } catch (e) {
     console.error(e);
   }
@@ -96,8 +124,13 @@ window.clearMatch = async (ronda, partidoIdx) => {
   if (localResultados[rKey] && localResultados[rKey][partidoIdx]) {
     localResultados[rKey][partidoIdx] = [null, null];
     try {
-      const docRef = doc(db, "artifacts", appId, "public", "data", "resultados", rKey);
-      await setDoc(docRef, { scores: localResultados[rKey], updatedAt: Date.now() }, { merge: true });
+      const { error } = await supabase
+        .from("resultados")
+        .upsert(
+          { ronda, partido_idx: partidoIdx, scores: [null, null] },
+          { onConflict: "ronda,partido_idx" }
+        );
+      if (error) throw error;
       refreshCurrentView();
     } catch (e) {
       console.error(e);
@@ -365,4 +398,30 @@ window.renderClasificacion = () => {
     rondasData[r].cruces.forEach((cruce, pIdx) => {
       const scoreArr = rRes[pIdx];
       if (scoreArr) {
-        if
+        if (scoreArr[0] !== null && scoreArr[0] !== "") { stats[cruce[0]].total += parseInt(scoreArr[0]); stats[cruce[0]].jugados++; }
+        if (scoreArr[1] !== null && scoreArr[1] !== "") { stats[cruce[1]].total += parseInt(scoreArr[1]); stats[cruce[1]].jugados++; }
+      }
+    });
+  }
+  const sorted = Object.values(stats).sort((a, b) => b.total - a.total);
+  let html = `<div class="ranking-box"><table><thead><tr><th>#</th><th class="text-left">Pareja</th><th>PJ</th><th>Puntos</th></tr></thead><tbody>`;
+  sorted.forEach((p, i) => {
+    let pos = i + 1;
+    if (i === 0) pos = '🥇 '; else if (i === 1) pos = '🥈 '; else if (i === 2) pos = '🥉 ';
+    html += `<tr><td class="text-center font-bold">${pos}</td><td class="font-bold text-sm uppercase">${p.nombre}</td><td class="text-center text-xs opacity-50">${p.jugados}</td><td class="text-center pts-column">${p.total}</td></tr>`;
+  });
+  container.innerHTML = html + "</tbody></table></div>";
+  updateNavUI("ranking");
+};
+
+function updateNavUI(active) {
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.getElementById(`btn-${i}`);
+    if (btn) btn.classList.toggle("active-ronda", active === i);
+  }
+  const rb = document.getElementById('btn-ranking');
+  if (rb) rb.classList.toggle("active-ronda", active === "ranking");
+}
+</script>
+</body>
+</html>
