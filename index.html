@@ -178,7 +178,6 @@ function updateNavUI(active) {
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@900&family=Inter:wght@400;700;900&display=swap");
 
-/* BLINDAJE TOTAL CONTRA SUBRAYADOS */
 * { text-decoration: none !important; -webkit-tap-highlight-color: transparent; }
 a, a:hover, a:focus, a:active { text-decoration: none !important; color: inherit !important; }
 
@@ -217,7 +216,7 @@ body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-seri
 
 .match-card { background: var(--royal-pro-grad); border-radius: 1.8rem; padding: 1.6rem; margin-bottom: 1.4rem; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: none; }
 
-.team-name { font-size: 16px; font-weight: 700; color: white; letter-spacing: -0.01em; text-decoration: none !important; }
+.team-name { font-size: 16px; font-weight: 700; color: white; letter-spacing: -0.01em; }
 
 input { 
     width: 74px; height: 48px; background: white !important; color: #000 !important; 
@@ -226,13 +225,14 @@ input {
 
 .reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; }
 
-/* CLASIFICACIÓN LIMPIA */
-.ranking-container { background: rgba(255,255,255,0.04); border-radius: 2rem; overflow: hidden; border: none !important; }
-.ranking-container table { width: 100%; border-collapse: collapse; border: none !important; }
-.ranking-container td { padding: 22px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); text-decoration: none !important; border-top: none !important; }
-.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.4; letter-spacing: 0.2em; border: none !important; }
-.no-link { color: white !important; text-decoration: none !important; border: none !important; box-shadow: none !important; }
-.pts-cell { text-align: center !important; color: white !important; border: none !important; }
+/* CLASIFICACIÓN CON EL MISMO GRADIENTE AZUL ROYAL */
+.ranking-container { background: var(--royal-pro-grad); border-radius: 1.8rem; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.4); margin-bottom: 2rem; }
+.ranking-container table { width: 100%; border-collapse: collapse; }
+.ranking-container td { padding: 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ranking-container tr:last-child td { border-bottom: none; }
+.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.5; letter-spacing: 0.2em; color: white; font-weight: 900; }
+.no-link { color: white !important; }
+.pts-cell { text-align: center !important; color: white !important; }
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
