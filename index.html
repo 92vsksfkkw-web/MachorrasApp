@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Machorras" />
 <meta name="theme-color" content="#022c22" />
+
+<!-- MANIFEST PWA -->
+<link rel="manifest" href="manifest.json" />
+
 <link rel="apple-touch-icon" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
 <link rel="icon" type="image/jpeg" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
 <title>Torneo Machorras</title>
@@ -387,41 +391,4 @@ window.renderRonda = (num) => {
 };
 
 window.renderClasificacion = () => {
-  const container = document.getElementById("main-content");
-  if (!container) return;
-  const resultados = window.getResultados();
-  const stats = {};
-  for (let i = 1; i <= 20; i++) stats[i] = { id: i, nombre: parejas[i], total: 0, jugados: 0 };
-  for (let r = 1; r <= 10; r++) {
-    const rRes = resultados[r.toString()];
-    if (!rRes) continue;
-    rondasData[r].cruces.forEach((cruce, pIdx) => {
-      const scoreArr = rRes[pIdx];
-      if (scoreArr) {
-        if (scoreArr[0] !== null && scoreArr[0] !== "") { stats[cruce[0]].total += parseInt(scoreArr[0]); stats[cruce[0]].jugados++; }
-        if (scoreArr[1] !== null && scoreArr[1] !== "") { stats[cruce[1]].total += parseInt(scoreArr[1]); stats[cruce[1]].jugados++; }
-      }
-    });
-  }
-  const sorted = Object.values(stats).sort((a, b) => b.total - a.total);
-  let html = `<div class="ranking-box"><table><thead><tr><th>#</th><th class="text-left">Pareja</th><th>PJ</th><th>Puntos</th></tr></thead><tbody>`;
-  sorted.forEach((p, i) => {
-    let pos = i + 1;
-    if (i === 0) pos = '🥇 '; else if (i === 1) pos = '🥈 '; else if (i === 2) pos = '🥉 ';
-    html += `<tr><td class="text-center font-bold">${pos}</td><td class="font-bold text-sm uppercase">${p.nombre}</td><td class="text-center text-xs opacity-50">${p.jugados}</td><td class="text-center pts-column">${p.total}</td></tr>`;
-  });
-  container.innerHTML = html + "</tbody></table></div>";
-  updateNavUI("ranking");
-};
-
-function updateNavUI(active) {
-  for (let i = 1; i <= 10; i++) {
-    const btn = document.getElementById(`btn-${i}`);
-    if (btn) btn.classList.toggle("active-ronda", active === i);
-  }
-  const rb = document.getElementById('btn-ranking');
-  if (rb) rb.classList.toggle("active-ronda", active === "ranking");
-}
-</script>
-</body>
-</html>
+  const container = document.getElementById("main
