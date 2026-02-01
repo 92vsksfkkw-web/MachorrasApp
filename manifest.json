@@ -5,8 +5,8 @@
   "start_url": "index.html",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#022c22",
-  "theme_color": "#022c22",
+  "background_color": "#011a14",
+  "theme_color": "#011a14",
   "orientation": "portrait",
   "id": "americano-machorras-app",
   "lang": "es",
@@ -16,7 +16,7 @@
     {
       "src": "https://i.ibb.co/3Ym9m9hF/6-A666-C3-E-B605-4-D6-C-AC6-E-057-C63-FE762-C.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
