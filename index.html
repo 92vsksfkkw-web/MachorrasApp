@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Torneo Machorras Elite</title>
+<meta name="format-detection" content="telephone=no"> <title>Torneo Machorras Elite</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -158,7 +158,7 @@ window.renderClasificacion = () => {
   let html = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>PAREJA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>`;
   sorted.forEach((p, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1;
-    html += `<tr><td class="w-10 text-center font-black">${medal}</td><td class="font-bold text-sm uppercase">${p.nombre}</td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${p.total}</td></tr>`;
+    html += `<tr><td class="w-10 text-center font-black">${medal}</td><td class="ranking-team-name font-bold text-sm uppercase">${p.nombre}</td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${p.total}</td></tr>`;
   });
   container.innerHTML = html + "</tbody></table></div>";
   updateNavUI("ranking");
@@ -218,10 +218,12 @@ input {
 
 .reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; }
 
+/* AJUSTES CLASIFICACIÓN SIN SUBRAYADO */
 .ranking-container { background: rgba(255,255,255,0.04); border-radius: 2rem; overflow: hidden; }
 .ranking-container table { width: 100%; border-collapse: collapse; }
-.ranking-container td { padding: 22px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.4; letter-spacing: 0.2em; }
+.ranking-container td { padding: 22px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); text-decoration: none !important; }
+.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.4; letter-spacing: 0.2em; border: none; }
+.ranking-team-name { color: white !important; text-decoration: none !important; display: inline-block; }
 .pts-cell { text-align: center !important; color: white !important; }
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
