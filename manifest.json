@@ -1,20 +1,29 @@
 {
   "name": "Americano Machorras",
   "short_name": "Machorras",
+  "description": "App para gestionar resultados del torneo Americano Padel Machorras",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#022c22",
   "theme_color": "#022c22",
+  "orientation": "portrait",
+  "id": "/",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["sports", "social"],
   "icons": [
     {
-      "src": "https://i.ibb.co/4nmPJsHC/image.jpg",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://i.ibb.co/4nmPJsHC/image.jpg",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
