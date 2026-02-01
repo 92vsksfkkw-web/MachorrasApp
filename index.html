@@ -115,10 +115,10 @@ window.renderRonda = (num) => {
     const s1 = (mS[0] !== null) ? mS[0] : "";
     const s2 = (mS[1] !== null) ? mS[1] : "";
     html += `
-      <div class="match-card ${s1 !== "" && s2 !== "" ? 'completed' : ''}">
+      <div class="match-card">
         <div class="flex justify-between items-center mb-4">
             <span class="pista-tag">PISTA ${idx + 1}</span>
-            <button class="reset-btn" onclick="window.clearMatch(${num},${idx})">RESET</button>
+            <button class="reset-btn" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
         </div>
         <div class="flex items-center justify-between mb-3">
           <span class="team-name">${parejas[cruce[0]]}</span>
@@ -166,60 +166,59 @@ function updateNavUI(active) {
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@900&family=Inter:wght@400;700;900&display=swap");
 
-:root { --green: #22c55e; --dark-bg: #011a14; --metal: linear-gradient(135deg, #064e3b 0%, #022c22 100%); }
+:root { --green: #22c55e; --dark-bg: #011a14; --royal-blue: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); }
 
 body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
 
-/* HEADER METAL */
-.header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
+/* HEADER SIN LÍNEAS */
+.header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; border: none; }
 
-/* AJUSTE LOGO FINAL: CIRCULO 120PX + ZOOM 1.3 */
+/* LOGO FINAL: ZOOM 1.8 */
 .logo-box { 
     width: 120px; height: 120px; margin: 0 auto; 
     border-radius: 50%; border: 3px solid white; 
     overflow: hidden; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 30px rgba(34, 197, 94, 0.3); background: white;
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.4); background: white;
 }
 .logo-box img { 
     width: 100%; height: 100%; object-fit: cover; 
-    transform: scale(1.3); /* ELIMINA BORDES POR COMPLETO */
+    transform: scale(1.8); /* ELIMINA BORDES POR COMPLETO */
 }
 
-.txt-green { color: var(--green); font-weight: 900; letter-spacing: 0.35em; font-size: 1rem; margin-top: 1.5rem; display: block; text-shadow: 0 0 10px rgba(34,197,94,0.5); }
-.txt-logo { font-family: 'Fira Sans', sans-serif; font-size: 3.4rem; line-height: 0.8; margin-top: 0.4rem; text-shadow: 2px 2px 0px #064e3b, 5px 5px 15px rgba(0,0,0,0.5); }
+.txt-green { color: var(--green); font-weight: 900; letter-spacing: 0.35em; font-size: 1rem; margin-top: 1.5rem; display: block; }
+.txt-logo { font-family: 'Fira Sans', sans-serif; font-size: 3.4rem; line-height: 0.8; margin-top: 0.4rem; text-shadow: 4px 4px 15px rgba(0,0,0,0.6); }
 
-/* NAVEGACIÓN PRO */
-.nav-box { position: sticky; top: 1rem; z-index: 100; margin: -1.5rem 1rem 2rem; background: rgba(1, 26, 20, 0.9); backdrop-filter: blur(20px); padding: 0.75rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); }
+/* NAVEGACIÓN LIMPIA SIN LÍNEAS LATERALES */
+.nav-box { position: sticky; top: 1rem; z-index: 100; margin: -1.5rem 1rem 2rem; background: rgba(1, 26, 20, 0.95); backdrop-filter: blur(20px); padding: 0.75rem; border-radius: 2rem; border: none; }
 .nav-scroll { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .nav-scroll::-webkit-scrollbar { display: none; }
 
-.btn-ronda-base { background: rgba(255,255,255,0.05); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; transition: 0.3s; color: rgba(255,255,255,0.6); }
-.active-ronda { background: var(--green) !important; color: #000 !important; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3); }
+.btn-ronda-base { background: rgba(255,255,255,0.05); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.6); border: none; }
+.active-ronda { background: var(--green) !important; color: #000 !important; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.4); }
 
-/* TARJETAS METÁLICAS */
-.match-card { background: linear-gradient(145deg, #03362a 0%, #011a14 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.8rem; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 10px 10px 20px rgba(0,0,0,0.3); }
-.match-card.completed { border: 1px solid var(--green); box-shadow: 0 0 15px rgba(34, 197, 94, 0.1); }
+/* TARJETAS AZUL ROYAL (COLOR TOP CHICA) */
+.match-card { background: var(--royal-blue); border-radius: 1.8rem; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: none; }
 
-.pista-tag { background: rgba(34, 197, 94, 0.15); color: var(--green); padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 10px; font-weight: 900; }
-.team-name { font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.9); }
+.pista-tag { background: rgba(255, 255, 255, 0.2); color: white; padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 10px; font-weight: 900; }
+.team-name { font-size: 15px; font-weight: 700; color: white; }
 
-/* INPUTS MÁS ANCHOS Y 50-50 BOLD */
+/* INPUTS ANCHOS Y CLAROS */
 input { 
-    width: 70px; height: 44px; background: white !important; color: #000 !important; 
+    width: 72px; height: 46px; background: white !important; color: #000 !important; 
     text-align: center; border-radius: 0.8rem; font-weight: 700; font-size: 22px; border: none; 
 }
 
-.reset-btn { color: white; opacity: 0.2; font-size: 9px; font-weight: 900; letter-spacing: 0.1em; }
+.reset-btn { color: white; opacity: 0.3; font-size: 9px; font-weight: 900; border: none; }
 
-/* CLASIFICACIÓN CENTRADA */
-.ranking-container { background: #022c22; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+/* CLASIFICACIÓN CENTRADA Y BLANCA */
+.ranking-container { background: rgba(255,255,255,0.03); border-radius: 2rem; overflow: hidden; border: none; }
 .ranking-container table { width: 100%; }
 .ranking-container td { padding: 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.3; letter-spacing: 0.2em; }
-.pts-cell { text-align: center !important; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.3; letter-spacing: 0.2em; border: none; }
+.pts-cell { text-align: center !important; color: white !important; }
 
-.animate-fade-in { animation: fadeIn 0.5s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
 </head>
 <body>
@@ -233,7 +232,7 @@ input {
 
   <nav class="nav-box">
     <div class="nav-scroll" id="buttons-rondas"></div>
-    <button onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-4 uppercase tracking-[0.2em]">Clasificación Pro</button>
+    <button onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-4 uppercase tracking-[0.2em]">Clasificación</button>
   </nav>
 
   <main id="main-content" class="p-4"></main>
