@@ -116,11 +116,11 @@ window.renderRonda = (num) => {
     const s2 = (mS[1] !== null) ? mS[1] : "";
     html += `
       <div class="match-card">
-        <div class="flex justify-between items-center mb-4">
-            <span class="pista-tag">PISTA ${idx + 1}</span>
+        <div class="flex justify-between items-center mb-5">
+            <span class="pista-label-pro">PISTA ${idx + 1}</span>
             <button class="reset-btn" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
         </div>
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-4">
           <span class="team-name">${parejas[cruce[0]]}</span>
           <input type="number" inputmode="numeric" placeholder="-" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
         </div>
@@ -166,14 +166,18 @@ function updateNavUI(active) {
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@900&family=Inter:wght@400;700;900&display=swap");
 
-:root { --green: #22c55e; --dark-bg: #011a14; --royal-blue: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); }
+:root { 
+    --green: #22c55e; 
+    --dark-bg: #011a14; 
+    --royal-pro-grad: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #111827 100%); 
+}
 
 body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
 
-/* HEADER SIN LÍNEAS */
-.header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; border: none; }
+/* HEADER LIMPIO */
+.header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; }
 
-/* LOGO FINAL: ZOOM 1.8 */
+/* LOGO: ESCALA 1.7 */
 .logo-box { 
     width: 120px; height: 120px; margin: 0 auto; 
     border-radius: 50%; border: 3px solid white; 
@@ -182,43 +186,45 @@ body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-seri
 }
 .logo-box img { 
     width: 100%; height: 100%; object-fit: cover; 
-    transform: scale(1.8); /* ELIMINA BORDES POR COMPLETO */
+    transform: scale(1.7); 
 }
 
 .txt-green { color: var(--green); font-weight: 900; letter-spacing: 0.35em; font-size: 1rem; margin-top: 1.5rem; display: block; }
 .txt-logo { font-family: 'Fira Sans', sans-serif; font-size: 3.4rem; line-height: 0.8; margin-top: 0.4rem; text-shadow: 4px 4px 15px rgba(0,0,0,0.6); }
 
-/* NAVEGACIÓN LIMPIA SIN LÍNEAS LATERALES */
-.nav-box { position: sticky; top: 1rem; z-index: 100; margin: -1.5rem 1rem 2rem; background: rgba(1, 26, 20, 0.95); backdrop-filter: blur(20px); padding: 0.75rem; border-radius: 2rem; border: none; }
+/* NAVEGACIÓN SIN LÍNEAS */
+.nav-box { position: sticky; top: 1rem; z-index: 100; margin: -1.5rem 1rem 2rem; background: rgba(1, 26, 20, 0.95); backdrop-filter: blur(20px); padding: 0.75rem; border-radius: 2rem; }
 .nav-scroll { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .nav-scroll::-webkit-scrollbar { display: none; }
 
-.btn-ronda-base { background: rgba(255,255,255,0.05); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.6); border: none; }
+.btn-ronda-base { background: rgba(255,255,255,0.08); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.7); border: none; }
 .active-ronda { background: var(--green) !important; color: #000 !important; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.4); }
 
-/* TARJETAS AZUL ROYAL (COLOR TOP CHICA) */
-.match-card { background: var(--royal-blue); border-radius: 1.8rem; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: none; }
+/* ETIQUETA PISTA CON ESTILO R1, R2... */
+.pista-label-pro { background: rgba(255,255,255,0.15); padding: 0.6rem 1.2rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: white; letter-spacing: 0.05em; }
 
-.pista-tag { background: rgba(255, 255, 255, 0.2); color: white; padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 10px; font-weight: 900; }
-.team-name { font-size: 15px; font-weight: 700; color: white; }
+/* TARJETAS CON GRADIENTE AZUL PROFESIONAL */
+.match-card { background: var(--royal-pro-grad); border-radius: 1.8rem; padding: 1.6rem; margin-bottom: 1.4rem; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: none; }
 
-/* INPUTS ANCHOS Y CLAROS */
+.team-name { font-size: 16px; font-weight: 700; color: white; letter-spacing: -0.01em; }
+
+/* INPUTS */
 input { 
-    width: 72px; height: 46px; background: white !important; color: #000 !important; 
-    text-align: center; border-radius: 0.8rem; font-weight: 700; font-size: 22px; border: none; 
+    width: 74px; height: 48px; background: white !important; color: #000 !important; 
+    text-align: center; border-radius: 1rem; font-weight: 700; font-size: 24px; border: none; 
 }
 
-.reset-btn { color: white; opacity: 0.3; font-size: 9px; font-weight: 900; border: none; }
+.reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; }
 
-/* CLASIFICACIÓN CENTRADA Y BLANCA */
-.ranking-container { background: rgba(255,255,255,0.03); border-radius: 2rem; overflow: hidden; border: none; }
-.ranking-container table { width: 100%; }
-.ranking-container td { padding: 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.3; letter-spacing: 0.2em; border: none; }
+/* CLASIFICACIÓN */
+.ranking-container { background: rgba(255,255,255,0.04); border-radius: 2rem; overflow: hidden; }
+.ranking-container table { width: 100%; border-collapse: collapse; }
+.ranking-container td { padding: 22px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.4; letter-spacing: 0.2em; }
 .pts-cell { text-align: center !important; color: white !important; }
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
