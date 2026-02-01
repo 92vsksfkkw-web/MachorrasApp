@@ -9,14 +9,24 @@
 <meta name="apple-mobile-web-app-title" content="Machorras" />
 <meta name="theme-color" content="#022c22" />
 
-<!-- MANIFEST PWA -->
 <link rel="manifest" href="manifest.json" />
 
-<link rel="apple-touch-icon" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
-<link rel="icon" type="image/jpeg" href="https://i.ibb.co/4nmPJsHC/image.jpg" />
+<link rel="apple-touch-icon" href="https://i.ibb.co/938ThK0C/192x192.png" />
+<link rel="icon" type="image/png" href="https://i.ibb.co/938ThK0C/192x192.png" />
+
 <title>Torneo Machorras</title>
 <script src="https://cdn.tailwindcss.com"></script>
+
 <script type="module">
+// Registro service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('Service Worker registrado:', reg.scope))
+      .catch(err => console.warn('Error registrando Service Worker:', err));
+  });
+}
+
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
@@ -148,6 +158,111 @@ window.setCurrentView = (type, value) => {
   currentView = { type, value };
   refreshCurrentView();
 };
+
+
+// --- Render rondas y ranking ---
+
+const parejas = {
+  1: "Martina y Delfina", 2: "Gabinete Machorril", 3: "Azúcar Moreno", 4: "Golden Point",
+  5: "AR en la Red", 6: "Las Rebotonas", 7: "Two Strangers", 8: "Padeleo",
+  9: "Red Flag", 10: "Valkirias", 11: "Las Chinchillas", 12: "Las PY",
+  13: "Last Call", 14: "Red Queens", 15: "Las Dejaditas Letales", 16: "Chuchi's Team",
+  17: "Zipi y Zape", 18: "Las de la última bola", 19: "Bolitas", 20: "The Twins"
+};
+
+const rondasData = {
+  1: { cruces: [[1,11], [20,10], [2,12], [19,9], [3,13], [18,8], [4,14], [17,7], [5,15], [16,6]] },
+  2: { cruces: [[5,16], [1,10], [11,12], [20,9], [2,13], [19,8], [3,14], [18,7], [4,15], [17,6]] },
+  3: { cruces: [[4,16], [17,5], [1,12], [10,9], [11,13], [20,8], [2,14], [19,7], [3,15], [18,6]] },
+  4: { cruces: [[3,16], [18,5], [4,17], [1,9], [12,13], [10,8], [11,14], [20,7], [2,15], [19,6]] },
+  5: { cruces: [[2,16], [19,5], [3,17], [18,4], [1,13], [9,8], [12,14], [10,7], [11,15], [20,6]] },
+  6: { cruces: [[11,16], [20,5], [2,17], [19,4], [3,18], [1,8], [13,14], [9,7], [12,15], [10,6]] },
+  7: { cruces: [[12,16], [10,5], [11,17], [20,4], [2,18], [19,3], [1,14], [8,7], [13,15], [9,6]] },
+  8: { cruces: [[13,16], [9,5], [12,17], [10,4], [11,18], [20,3], [2,19], [1,7], [14,15], [8,6]] },
+  9: { cruces: [[14,16], [8,5], [13,17], [9,4], [12,18], [10,3], [11,19], [20,2], [1,15], [7,6]] },
+  10: { cruces: [[15,16], [7,5], [14,17], [8,4], [13,18], [9,3], [12,19], [10,2], [11,20], [1,6]] }
+};
+
+window.initButtons = () => {
+  const container = document.getElementById("buttons-rondas");
+  if (!container) return;
+  container.innerHTML = "";
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.createElement("button");
+    btn.id = `btn-${i}`;
+    btn.onclick = () => window.setCurrentView("ronda", i);
+    btn.className = "btn-ronda-base";
+    btn.innerText = `R${i}`;
+    container.appendChild(btn);
+  }
+};
+
+window.renderRonda = (num) => {
+  const container = document.getElementById("main-content");
+  if (!container) return;
+  const data = rondasData[num];
+  const resultados = window.getResultados();
+  const rKey = num.toString();
+  let html = `<div class="pb-10">`;
+  data.cruces.forEach((cruce, idx) => {
+    const matchScores = (resultados[rKey] && resultados[rKey][idx]) ? resultados[rKey][idx] : [null, null];
+    const s1 = (matchScores[0] !== null) ? matchScores[0] : "";
+    const s2 = (matchScores[1] !== null) ? matchScores[1] : "";
+    const isComplete = s1 !== "" && s2 !== "";
+    html += `
+      <div class="match-card ${isComplete ? 'completed' : ''}">
+        <span class="pista-label">Pista ${idx + 1}</span>
+        <div class="team-row mb-1">
+          <span class="team-name">${parejas[cruce[0]]}</span>
+          <input type="number" placeholder="0" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
+        </div>
+        <div class="team-row">
+          <span class="team-name">${parejas[cruce[1]]}</span>
+          <input type="number" placeholder="0" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
+        </div>
+        <a href="javascript:void(0)" class="clear-link text-[8px] opacity-30 block text-right mt-2" onclick="window.clearMatch(${num},${idx})">Borrar</a>
+      </div>`;
+  });
+  container.innerHTML = html + "</div>";
+  updateNavUI(num);
+};
+
+window.renderClasificacion = () => {
+  const container = document.getElementById("main-content");
+  if (!container) return;
+  const resultados = window.getResultados();
+  const stats = {};
+  for (let i = 1; i <= 20; i++) stats[i] = { id: i, nombre: parejas[i], total: 0, jugados: 0 };
+  for (let r = 1; r <= 10; r++) {
+    const rRes = resultados[r.toString()];
+    if (!rRes) continue;
+    rondasData[r].cruces.forEach((cruce, pIdx) => {
+      const scoreArr = rRes[pIdx];
+      if (scoreArr) {
+        if (scoreArr[0] !== null && scoreArr[0] !== "") { stats[cruce[0]].total += parseInt(scoreArr[0]); stats[cruce[0]].jugados++; }
+        if (scoreArr[1] !== null && scoreArr[1] !== "") { stats[cruce[1]].total += parseInt(scoreArr[1]); stats[cruce[1]].jugados++; }
+      }
+    });
+  }
+  const sorted = Object.values(stats).sort((a, b) => b.total - a.total);
+  let html = `<div class="ranking-box"><table><thead><tr><th>#</th><th class="text-left">Pareja</th><th>PJ</th><th>Puntos</th></tr></thead><tbody>`;
+  sorted.forEach((p, i) => {
+    let pos = i + 1;
+    if (i === 0) pos = '🥇 '; else if (i === 1) pos = '🥈 '; else if (i === 2) pos = '🥉 ';
+    html += `<tr><td class="text-center font-bold">${pos}</td><td class="font-bold text-sm uppercase">${p.nombre}</td><td class="text-center text-xs opacity-50">${p.jugados}</td><td class="text-center pts-column">${p.total}</td></tr>`;
+  });
+  container.innerHTML = html + "</tbody></table></div>";
+  updateNavUI("ranking");
+};
+
+function updateNavUI(active) {
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.getElementById(`btn-${i}`);
+    if (btn) btn.classList.toggle("active-ronda", active === i);
+  }
+  const rb = document.getElementById('btn-ranking');
+  if (rb) rb.classList.toggle("active-ronda", active === "ranking");
+}
 </script>
 
 <style>
@@ -259,136 +374,4 @@ body {
   height: 2.5rem;
 }
 .team-name {
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.9);
-  max-width: 65%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-input {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--brand-green);
-  font-weight: 900;
-  width: 3.8rem;
-  height: 2.2rem;
-  border-radius: 0.6rem;
-  text-align: center;
-  font-size: 1.1rem;
-}
-.ranking-box {
-  background: var(--blue-card-bg);
-  border-radius: 1.5rem;
-  overflow: hidden;
-  margin-bottom: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th {
-  font-size: 10px;
-  color: var(--brand-green);
-  padding: 1.25rem 1rem;
-  text-transform: uppercase;
-}
-td {
-  padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-.pts-column {
-  font-size: 1.3rem;
-  font-family: 'Fira Sans', sans-serif;
-  font-weight: 900;
-  color: white;
-}
-</style>
-</head>
-<body class="pb-24">
-<header class="header-main">
-  <div class="profile-circle-large">
-    <img src="https://i.ibb.co/4nmPJsHC/image.jpg" alt="Logo Machorras" />
-  </div>
-  <h1 class="text-6xl font-logo-heavy text-white">MACHORRAS</h1>
-  <p class="text-[10px] font-black uppercase tracking-[0.6em] text-green-400 mt-2">AMERICANO PADEL</p>
-</header>
-<div class="sticky-nav">
-  <div class="nav-container">
-    <div id="buttons-rondas" class="flex gap-2"></div>
-    <div class="w-px h-6 bg-white/10 self-center mx-1"></div>
-    <button onclick="window.setCurrentView('ranking', null)" id="btn-ranking" class="btn-ronda-base">Ranking</button>
-  </div>
-</div>
-<main id="main-content" class="px-4 max-w-lg mx-auto"></main>
-
-<script>
-const parejas = {
-  1: "Martina y Delfina", 2: "Gabinete Machorril", 3: "Azúcar Moreno", 4: "Golden Point",
-  5: "AR en la Red", 6: "Las Rebotonas", 7: "Two Strangers", 8: "Padeleo",
-  9: "Red Flag", 10: "Valkirias", 11: "Las Chinchillas", 12: "Las PY",
-  13: "Last Call", 14: "Red Queens", 15: "Las Dejaditas Letales", 16: "Chuchi's Team",
-  17: "Zipi y Zape", 18: "Las de la última bola", 19: "Bolitas", 20: "The Twins"
-};
-const rondasData = {
-  1: { cruces: [[1,11], [20,10], [2,12], [19,9], [3,13], [18,8], [4,14], [17,7], [5,15], [16,6]] },
-  2: { cruces: [[5,16], [1,10], [11,12], [20,9], [2,13], [19,8], [3,14], [18,7], [4,15], [17,6]] },
-  3: { cruces: [[4,16], [17,5], [1,12], [10,9], [11,13], [20,8], [2,14], [19,7], [3,15], [18,6]] },
-  4: { cruces: [[3,16], [18,5], [4,17], [1,9], [12,13], [10,8], [11,14], [20,7], [2,15], [19,6]] },
-  5: { cruces: [[2,16], [19,5], [3,17], [18,4], [1,13], [9,8], [12,14], [10,7], [11,15], [20,6]] },
-  6: { cruces: [[11,16], [20,5], [2,17], [19,4], [3,18], [1,8], [13,14], [9,7], [12,15], [10,6]] },
-  7: { cruces: [[12,16], [10,5], [11,17], [20,4], [2,18], [19,3], [1,14], [8,7], [13,15], [9,6]] },
-  8: { cruces: [[13,16], [9,5], [12,17], [10,4], [11,18], [20,3], [2,19], [1,7], [14,15], [8,6]] },
-  9: { cruces: [[14,16], [8,5], [13,17], [9,4], [12,18], [10,3], [11,19], [20,2], [1,15], [7,6]] },
-  10: { cruces: [[15,16], [7,5], [14,17], [8,4], [13,18], [9,3], [12,19], [10,2], [11,20], [1,6]] }
-};
-
-window.initButtons = () => {
-  const container = document.getElementById("buttons-rondas");
-  if (!container) return;
-  container.innerHTML = "";
-  for (let i = 1; i <= 10; i++) {
-    const btn = document.createElement("button");
-    btn.id = `btn-${i}`;
-    btn.onclick = () => window.setCurrentView("ronda", i);
-    btn.className = "btn-ronda-base";
-    btn.innerText = `R${i}`;
-    container.appendChild(btn);
-  }
-};
-
-window.renderRonda = (num) => {
-  const container = document.getElementById("main-content");
-  if (!container) return;
-  const data = rondasData[num];
-  const resultados = window.getResultados();
-  const rKey = num.toString();
-  let html = `<div class="pb-10">`;
-  data.cruces.forEach((cruce, idx) => {
-    const matchScores = (resultados[rKey] && resultados[rKey][idx]) ? resultados[rKey][idx] : [null, null];
-    const s1 = (matchScores[0] !== null) ? matchScores[0] : "";
-    const s2 = (matchScores[1] !== null) ? matchScores[1] : "";
-    const isComplete = s1 !== "" && s2 !== "";
-    html += `
-      <div class="match-card ${isComplete ? 'completed' : ''}">
-        <span class="pista-label">Pista ${idx + 1}</span>
-        <div class="team-row mb-1">
-          <span class="team-name">${parejas[cruce[0]]}</span>
-          <input type="number" placeholder="0" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
-        </div>
-        <div class="team-row">
-          <span class="team-name">${parejas[cruce[1]]}</span>
-          <input type="number" placeholder="0" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
-        </div>
-        <a href="javascript:void(0)" class="clear-link text-[8px] opacity-30 block text-right mt-2" onclick="window.clearMatch(${num},${idx})">Borrar</a>
-      </div>`;
-  });
-  container.innerHTML = html + "</div>";
-  updateNavUI(num);
-};
-
-window.renderClasificacion = () => {
-  const container = document.getElementById("main
+  font-size: 0
