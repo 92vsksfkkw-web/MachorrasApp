@@ -132,7 +132,9 @@ const initAuth = async () => {
   }
 };
 
-initAuth();
+// (initAuth() se invoca al final del script, cuando todas las constantes
+//  parejas / rondasData / NOMBRES_PISTAS ya están inicializadas. Hacerlo aquí
+//  causaría un ReferenceError por Temporal Dead Zone al renderRonda(1).)
 
 // ---------- Acciones expuestas ----------
 window.setCurrentView = (type, value) => {
@@ -322,6 +324,13 @@ function updateNavUI(active) {
   const activeBtn = document.getElementById(active === "ranking" ? "btn-ranking" : `btn-${active}`);
   if (activeBtn) activeBtn.classList.add("active-ronda");
 }
+
+// ---------- Arranque ----------
+// Se invoca al final, cuando TODAS las constantes (parejas, rondasData,
+// NOMBRES_PISTAS) ya están inicializadas. De lo contrario el primer
+// renderRonda(1) lanzaría ReferenceError (TDZ) y la pantalla quedaría
+// sin partidos hasta que el usuario tocara una ronda.
+initAuth();
 </script>
 
 <style>
