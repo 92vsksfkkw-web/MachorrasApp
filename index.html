@@ -7,6 +7,8 @@
 <meta name="format-detection" content="address=no" />
 <meta name="format-detection" content="email=no" />
 <meta name="format-detection" content="date=no" />
+<meta name="description" content="Gestor en tiempo real del torneo Americano Machorras: 28 jugadoras, 12 rondas, ranking individual." />
+<meta name="theme-color" content="#011a14" />
 <title>Americano Machorras</title>
 
 <link rel="manifest" href="manifest.json">
@@ -17,6 +19,9 @@
 <link rel="apple-touch-icon" href="https://i.ibb.co/WN3Rx3fV/192.png">
 <link rel="icon" type="image/png" href="https://i.ibb.co/WN3Rx3fV/192.png">
 
+<link rel="preconnect" href="https://sxtgzpzneqyaxljpkqmb.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
 <script src="https://cdn.tailwindcss.com"></script>
 
 <script type="module">
@@ -26,178 +31,296 @@ const supabaseUrl = "https://sxtgzpzneqyaxljpkqmb.supabase.co";
 const supabaseAnonKey = "sb_publishable_mrrBNQvb9QKx4pfkSMoSuQ_IxtFSaaX";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-let localResultados = {};
+// ---------- Constantes torneo ----------
+const TOTAL_RONDAS = 12;
+const TOTAL_JUGADORAS = 28;
+const SAVE_DEBOUNCE_MS = 350;
+const MAX_SCORE = 99.99;
 
-const startApp = async () => {
-  try {
-    const { data, error } = await supabase.from("resultados").select("*");
-    if (error) throw error;
-    localResultados = {};
-    data.forEach((row) => {
-      const rKey = row.ronda.toString();
-      if (!localResultados[rKey]) localResultados[rKey] = {};
-      localResultados[rKey][row.partido_idx] = row.scores;
-    });
-    window.initButtons();
-    window.renderRonda(1);
-    
-    supabase.channel("changes").on("postgres_changes", { event: "*", schema: "public", table: "resultados" }, () => {
-        startApp(); 
-    }).subscribe();
-  } catch (err) {
-    window.initButtons();
-    window.renderRonda(1);
+// ---------- Estado ----------
+const state = {
+  resultados: {},          // { ronda -> { partidoIdx -> [s1, s2] } }
+  currentView: { type: "ronda", value: 1 },
+  channelSubscribed: false,
+  pendingSaves: new Map(), // key -> { timer, payload }
+  loaded: false,
+};
+
+// ---------- Helpers ----------
+const keyFor = (ronda, partidoIdx) => `${ronda}:${partidoIdx}`;
+
+const sanitizeScore = (raw) => {
+  if (raw === "" || raw === null || raw === undefined) return null;
+  const cleaned = raw.toString().replace(",", ".").trim();
+  const n = parseFloat(cleaned);
+  if (isNaN(n)) return null;
+  return Math.max(0, Math.min(MAX_SCORE, n));
+};
+
+// ---------- Carga inicial ----------
+const fetchResultados = async () => {
+  const { data, error } = await supabase.from("resultados").select("*");
+  if (error) throw error;
+  const map = {};
+  data.forEach((row) => {
+    const r = row.ronda.toString();
+    if (!map[r]) map[r] = {};
+    map[r][row.partido_idx] = row.scores;
+  });
+  state.resultados = map;
+};
+
+const subscribeRealtime = () => {
+  if (state.channelSubscribed) return;
+  state.channelSubscribed = true;
+  supabase
+    .channel("resultados-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "resultados" },
+      (payload) => applyRemoteChange(payload)
+    )
+    .subscribe();
+};
+
+const applyRemoteChange = (payload) => {
+  const row = payload.new || payload.old;
+  if (!row) return;
+  const r = row.ronda?.toString();
+  if (!r) return;
+  if (payload.eventType === "DELETE") {
+    if (state.resultados[r]) delete state.resultados[r][row.partido_idx];
+  } else {
+    if (!state.resultados[r]) state.resultados[r] = {};
+    state.resultados[r][row.partido_idx] = row.scores;
+  }
+  // Re-render ONLY si la vista actual está afectada y nadie tiene foco en un input
+  const activeIsInput = document.activeElement && document.activeElement.tagName === "INPUT";
+  if (activeIsInput) return; // no rompemos la edición en curso
+  if (state.currentView.type === "ronda" && state.currentView.value.toString() === r) {
+    renderRonda(state.currentView.value);
+  } else if (state.currentView.type === "ranking") {
+    renderClasificacion();
   }
 };
 
+const startApp = async () => {
+  // 1) Render INMEDIATO con datos vacíos para que la UI aparezca al instante
+  initButtons();
+  renderRonda(1);
+  // 2) En paralelo, intentamos cargar datos y suscribirnos
+  try {
+    await fetchResultados();
+    // Refrescamos la vista actual con los datos cargados
+    if (state.currentView.type === "ronda") renderRonda(state.currentView.value);
+    else renderClasificacion();
+  } catch (err) {
+    console.warn("[Machorras] No se pudo cargar resultados:", err?.message || err);
+  }
+  state.loaded = true;
+  subscribeRealtime();
+};
+
 const initAuth = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) await supabase.auth.signInAnonymously();
+  // Lanzamos el render primero (initAuth no bloquea la UI)
   startApp();
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) await supabase.auth.signInAnonymously();
+  } catch (err) {
+    console.warn("[Machorras] Auth anónima falló, continuamos en modo lectura:", err?.message || err);
+  }
 };
 
 initAuth();
 
+// ---------- Acciones expuestas ----------
 window.setCurrentView = (type, value) => {
-  if (type === "ronda") window.renderRonda(value);
-  else window.renderClasificacion();
+  if (type === "ronda") {
+    state.currentView = { type: "ronda", value };
+    renderRonda(value);
+  } else {
+    state.currentView = { type: "ranking" };
+    renderClasificacion();
+  }
 };
 
-window.saveScore = async (ronda, partidoIdx, parejaPos, value) => {
-  const valSanitized = value.toString().replace(',', '.');
-  const valFloat = valSanitized === "" ? null : parseFloat(valSanitized);
-  
+window.saveScore = (ronda, partidoIdx, parejaPos, value) => {
+  const valFloat = sanitizeScore(value);
   const rKey = ronda.toString();
-  if (!localResultados[rKey]) localResultados[rKey] = {};
-  if (!localResultados[rKey][partidoIdx]) localResultados[rKey][partidoIdx] = [null, null];
-  
-  localResultados[rKey][partidoIdx][parejaPos] = valFloat;
-  
-  await supabase.from("resultados").upsert(
-    { ronda, partido_idx: partidoIdx, scores: localResultados[rKey][partidoIdx] },
-    { onConflict: "ronda,partido_idx" }
-  );
+  if (!state.resultados[rKey]) state.resultados[rKey] = {};
+  if (!state.resultados[rKey][partidoIdx]) state.resultados[rKey][partidoIdx] = [null, null];
+  state.resultados[rKey][partidoIdx][parejaPos] = valFloat;
+
+  // Debounce write a Supabase
+  const k = keyFor(ronda, partidoIdx);
+  const prev = state.pendingSaves.get(k);
+  if (prev?.timer) clearTimeout(prev.timer);
+  const timer = setTimeout(async () => {
+    state.pendingSaves.delete(k);
+    try {
+      await supabase.from("resultados").upsert(
+        { ronda, partido_idx: partidoIdx, scores: state.resultados[rKey][partidoIdx] },
+        { onConflict: "ronda,partido_idx" }
+      );
+    } catch (err) {
+      console.warn("[Machorras] Error guardando resultado:", err?.message || err);
+    }
+  }, SAVE_DEBOUNCE_MS);
+  state.pendingSaves.set(k, { timer });
 };
 
 window.clearMatch = async (ronda, partidoIdx) => {
   const rKey = ronda.toString();
-  if (localResultados[rKey]) {
-    localResultados[rKey][partidoIdx] = [null, null];
-    await supabase.from("resultados").upsert({ ronda, partido_idx: partidoIdx, scores: [null, null] }, { onConflict: "ronda,partido_idx" });
-    window.renderRonda(ronda);
+  if (!state.resultados[rKey]) state.resultados[rKey] = {};
+  state.resultados[rKey][partidoIdx] = [null, null];
+  // Cancelamos cualquier save pendiente de ese partido
+  const k = keyFor(ronda, partidoIdx);
+  const prev = state.pendingSaves.get(k);
+  if (prev?.timer) clearTimeout(prev.timer);
+  state.pendingSaves.delete(k);
+  try {
+    await supabase.from("resultados").upsert(
+      { ronda, partido_idx: partidoIdx, scores: [null, null] },
+      { onConflict: "ronda,partido_idx" }
+    );
+  } catch (err) {
+    console.warn("[Machorras] Error al borrar partido:", err?.message || err);
   }
+  renderRonda(ronda);
 };
 
-// --- JUGADORAS ACTUALIZADAS (28) ---
+// ---------- JUGADORAS (28) ----------
 const parejas = {
-  1: "Paula Avilés", 2: "Cristina", 3: "Nisamar", 4: "M. Isabel Bonilla", 
-  5: "Paula Alonso", 6: "Patricia Elzo", 7: "Elena Herrera", 8: "Silvia Pulido", 
-  9: "Natalia Ferrarons", 10: "Marta Benítez", 11: "Caridad Martínez", 12: "Ana", 
-  13: "Xelvi", 14: "Amalia", 15: "Helena Ortega", 16: "Paula Sanz", 
-  17: "Maite", 18: "Rosi Medina", 19: "Sari Vera", 20: "Prado", 
-  21: "Alba", 22: "María Suárez", 23: "Judith Ortega", 24: "Carla Glez", 
+  1: "Paula Avilés", 2: "Cristina", 3: "Adaya", 4: "M. Isabel Bonilla",
+  5: "Paula Alonso", 6: "Patricia Elzo", 7: "Elena Herrera", 8: "Silvia Pulido",
+  9: "Natalia Ferrarons", 10: "Marta Benítez", 11: "Caridad Martínez", 12: "Ana",
+  13: "Xelvi", 14: "Amalia", 15: "Helena Ortega", 16: "Paula Sanz",
+  17: "Maite", 18: "Rosi Medina", 19: "Sari Vera", 20: "Prado",
+  21: "Alba", 22: "María Suárez", 23: "Judith Ortega", 24: "Carla Glez",
   25: "Aida", 26: "Alexia", 27: "Judit M.", 28: "Judit Duran"
 };
 
-// --- RONDAS OPTIMIZADAS (AMERICANO INDIVIDUAL) ---
-// Formato: [jugadora1, jugadora2, jugadora3, jugadora4] -> (1&2 vs 3&4)
+// ---------- 12 RONDAS OPTIMIZADAS (AMERICANO INDIVIDUAL) ----------
+// Schedule generado para minimizar repeticiones:
+//   - 0 parejas (compañeras) repetidas en todo el torneo
+//   - 17 pares de oponentes coinciden 2 veces (mínimo matemático con 12 rondas)
+// Formato: [j1, j2, j3, j4]  →  (j1 & j2)  vs  (j3 & j4)
 const rondasData = {
-  1: { cruces: [[1,16,9,10], [12,15,5,17], [14,25,13,19], [20,27,3,26], [6,2,4,18], [22,7,24,28], [21,23,11,8]] },
-  2: { cruces: [[21,27,24,18], [1,14,23,25], [2,26,16,7], [6,11,15,8], [10,22,5,12], [17,19,13,20], [3,9,28,4]] },
-  3: { cruces: [[13,24,6,20], [1,18,14,11], [17,9,25,19], [22,21,2,4], [12,16,3,28], [8,23,26,15], [10,5,7,27]] },
-  4: { cruces: [[5,1,21,19], [22,12,20,16], [15,6,26,27], [13,28,23,4], [8,3,9,18], [10,14,2,24], [17,25,7,11]] },
-  5: { cruces: [[11,25,12,4], [9,15,21,10], [27,14,16,8], [6,13,3,1], [23,19,18,7], [5,2,24,20], [17,22,28,26]] },
-  6: { cruces: [[1,17,2,21], [3,23,20,10], [15,19,25,27], [14,22,12,13], [16,4,5,6], [18,26,11,28], [9,7,24,8]] }
+  1:  { cruces: [[24,27,12,11],[23,2,6,28],[20,14,10,18],[17,1,8,22],[7,13,21,15],[16,4,9,3],[25,26,19,5]] },
+  2:  { cruces: [[10,2,21,3],[16,20,6,12],[25,5,14,1],[7,4,22,17],[15,19,24,11],[18,9,8,13],[28,23,27,26]] },
+  3:  { cruces: [[22,6,27,13],[9,7,24,19],[14,3,20,11],[4,25,21,28],[26,2,17,18],[10,5,23,15],[1,8,12,16]] },
+  4:  { cruces: [[6,5,22,11],[7,25,26,20],[14,15,2,8],[24,12,13,4],[23,21,16,3],[17,9,18,28],[27,1,19,10]] },
+  5:  { cruces: [[2,28,10,13],[20,1,24,17],[21,22,11,9],[26,23,25,12],[16,15,19,18],[8,14,6,3],[4,27,5,7]] },
+  6:  { cruces: [[24,28,18,14],[25,15,9,27],[21,10,17,5],[11,8,26,12],[2,4,16,22],[20,7,1,23],[13,6,3,19]] },
+  7:  { cruces: [[5,28,7,24],[14,25,12,13],[16,19,22,10],[9,15,3,17],[27,8,21,20],[2,6,1,26],[4,23,11,18]] },
+  8:  { cruces: [[19,11,18,20],[9,28,1,5],[13,2,4,8],[15,7,14,12],[3,22,24,25],[21,17,23,6],[27,10,26,16]] },
+  9:  { cruces: [[15,26,1,21],[17,23,14,19],[16,2,5,20],[8,12,28,10],[24,13,11,25],[18,3,22,27],[4,9,6,7]] },
+  10: { cruces: [[23,16,13,15],[18,7,6,25],[9,21,12,20],[26,10,14,4],[22,19,28,3],[24,5,8,17],[11,27,2,1]] },
+  11: { cruces: [[11,23,16,8],[14,21,22,1],[12,5,17,19],[7,26,13,3],[10,4,18,25],[20,6,28,15],[9,24,27,2]] },
+  12: { cruces: [[12,18,5,3],[4,17,19,27],[2,7,8,23],[15,20,22,26],[16,21,14,24],[1,10,9,13],[6,11,28,25]] }
 };
 
-window.initButtons = () => {
+const NOMBRES_PISTAS = ["20", "19", "18", "17", "16", "14", "13"];
+
+// ---------- Render ----------
+function initButtons() {
   const container = document.getElementById("buttons-rondas");
   container.innerHTML = "";
-  for (let i = 1; i <= 6; i++) {
+  const frag = document.createDocumentFragment();
+  for (let i = 1; i <= TOTAL_RONDAS; i++) {
     const btn = document.createElement("button");
     btn.id = `btn-${i}`;
+    btn.type = "button";
+    btn.setAttribute("aria-label", `Ronda ${i}`);
     btn.onclick = () => window.setCurrentView("ronda", i);
     btn.className = "btn-ronda-base";
     btn.innerText = `R${i}`;
-    container.appendChild(btn);
+    frag.appendChild(btn);
   }
-};
+  container.appendChild(frag);
+}
 
-window.renderRonda = (num) => {
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+function renderRonda(num) {
   const container = document.getElementById("main-content");
   const data = rondasData[num];
   const rKey = num.toString();
-  let html = `<div class="animate-fade-in pb-10">`;
-
-  const nombresPistas = ["20", "19", "18", "17", "16", "14", "13"];
+  const parts = [`<div class="animate-fade-in pb-10">`];
 
   data.cruces.forEach((cruce, idx) => {
-    const mS = (localResultados[rKey] && localResultados[rKey][idx]) ? localResultados[rKey][idx] : [null, null];
-    const s1 = (mS[0] !== null) ? mS[0] : "";
-    const s2 = (mS[1] !== null) ? mS[1] : "";
-    
-    const pistaReal = nombresPistas[idx];
+    const mS = (state.resultados[rKey] && state.resultados[rKey][idx]) ? state.resultados[rKey][idx] : [null, null];
+    const s1 = (mS[0] !== null && mS[0] !== undefined) ? mS[0] : "";
+    const s2 = (mS[1] !== null && mS[1] !== undefined) ? mS[1] : "";
+    const pistaReal = NOMBRES_PISTAS[idx] || (idx + 1);
 
-    // cruce[0] y [1] son pareja 1, cruce[2] y [3] son pareja 2
-    html += `
+    parts.push(`
       <div class="match-card">
         <div class="flex justify-between items-center mb-5">
             <span class="pista-label-pro">PISTA ${pistaReal}</span>
-            <button class="reset-btn" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
+            <button type="button" class="reset-btn" aria-label="Borrar resultado" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
         </div>
         <div class="flex items-center justify-between mb-4">
-          <span class="team-name">${parejas[cruce[0]]} / ${parejas[cruce[1]]}</span>
-          <input type="number" step="0.01" inputmode="decimal" placeholder="-" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
+          <span class="team-name">${escapeHtml(parejas[cruce[0]])} / ${escapeHtml(parejas[cruce[1]])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 1" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
         </div>
         <div class="flex items-center justify-between">
-          <span class="team-name">${parejas[cruce[2]]} / ${parejas[cruce[3]]}</span>
-          <input type="number" step="0.01" inputmode="decimal" placeholder="-" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
+          <span class="team-name">${escapeHtml(parejas[cruce[2]])} / ${escapeHtml(parejas[cruce[3]])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 2" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
         </div>
-      </div>`;
+      </div>`);
   });
-  container.innerHTML = html + "</div>";
+  parts.push("</div>");
+  container.innerHTML = parts.join("");
   updateNavUI(num);
-};
+}
 
-window.renderClasificacion = () => {
+function renderClasificacion() {
   const container = document.getElementById("main-content");
   const stats = {};
-  for (let i = 1; i <= 28; i++) stats[i] = { nombre: parejas[i], total: 0, jugados: 0 };
-  
-  Object.keys(localResultados).forEach(rKey => {
-    Object.keys(localResultados[rKey]).forEach(pIdx => {
-      if(rondasData[rKey] && rondasData[rKey].cruces[pIdx]) {
-        const cruce = rondasData[rKey].cruces[pIdx];
-        const s = localResultados[rKey][pIdx];
-        if (s[0] !== null) { 
-            stats[cruce[0]].total += s[0]; stats[cruce[0]].jugados++; 
-            stats[cruce[1]].total += s[0]; stats[cruce[1]].jugados++;
-        }
-        if (s[1] !== null) { 
-            stats[cruce[2]].total += s[1]; stats[cruce[2]].jugados++; 
-            stats[cruce[3]].total += s[1]; stats[cruce[3]].jugados++;
-        }
+  for (let i = 1; i <= TOTAL_JUGADORAS; i++) {
+    stats[i] = { nombre: parejas[i], total: 0, jugados: 0 };
+  }
+
+  for (const rKey of Object.keys(state.resultados)) {
+    const ronda = state.resultados[rKey];
+    if (!rondasData[rKey]) continue;
+    for (const pIdx of Object.keys(ronda)) {
+      const cruce = rondasData[rKey].cruces[pIdx];
+      if (!cruce) continue;
+      const s = ronda[pIdx];
+      if (!s) continue;
+      if (s[0] !== null && s[0] !== undefined) {
+        stats[cruce[0]].total += s[0]; stats[cruce[0]].jugados++;
+        stats[cruce[1]].total += s[0]; stats[cruce[1]].jugados++;
       }
-    });
-  });
-  
+      if (s[1] !== null && s[1] !== undefined) {
+        stats[cruce[2]].total += s[1]; stats[cruce[2]].jugados++;
+        stats[cruce[3]].total += s[1]; stats[cruce[3]].jugados++;
+      }
+    }
+  }
+
   const sorted = Object.values(stats).sort((a, b) => b.total - a.total);
-  
-  let html = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>JUGADORA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>`;
-  
-  sorted.forEach((p, i) => {
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1;
-    const puntosVisuales = p.total.toFixed(2).replace('.', ',');
-    html += `<tr><td class="w-10 text-center font-black">${medal}</td><td class="font-bold text-sm uppercase"><span class="no-link">${p.nombre}</span></td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${puntosVisuales}</td></tr>`;
-  });
-  container.innerHTML = html + "</tbody></table></div>";
+  const rows = sorted.map((p, i) => {
+    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1;
+    const puntosVisuales = p.total.toFixed(2).replace(".", ",");
+    return `<tr><td class="w-10 text-center font-black">${medal}</td><td class="font-bold text-sm uppercase"><span class="no-link">${escapeHtml(p.nombre)}</span></td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${puntosVisuales}</td></tr>`;
+  }).join("");
+
+  container.innerHTML = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>JUGADORA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   updateNavUI("ranking");
-};
+}
 
 function updateNavUI(active) {
-  document.querySelectorAll('.btn-ronda-base').forEach(b => b.classList.remove('active-ronda'));
-  const activeBtn = document.getElementById(active === "ranking" ? 'btn-ranking' : `btn-${active}`);
-  if (activeBtn) activeBtn.classList.add('active-ronda');
+  document.querySelectorAll(".btn-ronda-base").forEach((b) => b.classList.remove("active-ronda"));
+  const activeBtn = document.getElementById(active === "ranking" ? "btn-ranking" : `btn-${active}`);
+  if (activeBtn) activeBtn.classList.add("active-ronda");
 }
 </script>
 
@@ -206,25 +329,25 @@ function updateNavUI(active) {
 
 * { text-decoration: none !important; -webkit-tap-highlight-color: transparent; }
 
-:root { 
-    --green: #22c55e; 
-    --dark-bg: #011a14; 
-    --royal-pro-grad: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #111827 100%); 
+:root {
+    --green: #22c55e;
+    --dark-bg: #011a14;
+    --royal-pro-grad: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #111827 100%);
 }
 
 body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
 
 .header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; }
 
-.logo-box { 
-    width: 120px; height: 120px; margin: 0 auto; 
-    border-radius: 50%; border: 3px solid white; 
+.logo-box {
+    width: 120px; height: 120px; margin: 0 auto;
+    border-radius: 50%; border: 3px solid white;
     overflow: hidden; display: flex; align-items: center; justify-content: center;
     box-shadow: 0 0 30px rgba(34, 197, 94, 0.4); background: white;
 }
-.logo-box img { 
-    width: 100%; height: 100%; object-fit: cover; 
-    transform: scale(1.7); 
+.logo-box img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scale(1.7);
 }
 
 .txt-green { color: var(--green); font-weight: 900; letter-spacing: 0.35em; font-size: 1rem; margin-top: 1.5rem; display: block; }
@@ -234,7 +357,7 @@ body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-seri
 .nav-scroll { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .nav-scroll::-webkit-scrollbar { display: none; }
 
-.btn-ronda-base { background: rgba(255,255,255,0.08); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.7); border: none; }
+.btn-ronda-base { background: rgba(255,255,255,0.08); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.7); border: none; flex-shrink: 0; cursor: pointer; }
 .active-ronda { background: var(--green) !important; color: #000 !important; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.4); }
 
 .pista-label-pro { background: rgba(255,255,255,0.15); padding: 0.6rem 1.2rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: white; letter-spacing: 0.05em; }
@@ -243,13 +366,13 @@ body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-seri
 
 .team-name { font-size: 14px; font-weight: 700; color: white; letter-spacing: -0.01em; width: 70%; line-height: 1.2; }
 
-input { 
-    width: 74px; height: 48px; background: white !important; color: #000 !important; 
+input {
+    width: 74px; height: 48px; background: white !important; color: #000 !important;
     text-align: center; border-radius: 1rem; font-weight: 900; font-size: 24px; border: none;
     text-shadow: 0.5px 0 0 #000, -0.5px 0 0 #000;
 }
 
-.reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; }
+.reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; background: transparent; cursor: pointer; }
 
 .ranking-container { background: var(--royal-pro-grad); border-radius: 1.8rem; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.4); margin-bottom: 2rem; }
 .ranking-container table { width: 100%; border-collapse: collapse; }
@@ -266,15 +389,15 @@ input {
 <body>
   <header class="header-main">
     <div class="logo-box">
-      <img src="https://i.ibb.co/ymqrcjXM/512.png" alt="Logo">
+      <img src="https://i.ibb.co/ymqrcjXM/512.png" alt="Logo Machorras" onerror="this.style.display='none'">
     </div>
-    <span class="txt-green">AMERICANO FEMENINO</span>
+    <span class="txt-green">AMERICANO</span>
     <h1 class="txt-logo text-white">MACHORRAS</h1>
   </header>
 
-  <nav class="nav-box">
+  <nav class="nav-box" aria-label="Navegación de rondas">
     <div class="nav-scroll" id="buttons-rondas"></div>
-    <button onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-4 uppercase tracking-[0.2em]">Clasificación Individual</button>
+    <button type="button" onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-4 uppercase tracking-[0.2em]" aria-label="Ver ranking">Ranking</button>
   </nav>
 
   <main id="main-content" class="p-4"></main>
