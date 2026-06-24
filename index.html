@@ -7,13 +7,13 @@
 <meta name="format-detection" content="address=no" />
 <meta name="format-detection" content="email=no" />
 <meta name="format-detection" content="date=no" />
-<meta name="description" content="Gestor en tiempo real del torneo Americano Machorras: 28 jugadoras, 12 rondas, ranking individual." />
-<meta name="theme-color" content="#011a14" />
+<meta name="description" content="Gestor en tiempo real del torneo Americano Machorras." />
+<meta name="theme-color" content="#FAFAFA" />
 <title>Americano Machorras</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Machorras">
 
 <link rel="apple-touch-icon" href="https://i.ibb.co/WN3Rx3fV/192.png">
@@ -21,6 +21,7 @@
 
 <link rel="preconnect" href="https://sxtgzpzneqyaxljpkqmb.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <script src="https://cdn.tailwindcss.com"></script>
 
@@ -32,17 +33,17 @@ const supabaseAnonKey = "sb_publishable_mrrBNQvb9QKx4pfkSMoSuQ_IxtFSaaX";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ---------- Constantes torneo ----------
-const TOTAL_RONDAS = 12;
-const TOTAL_JUGADORAS = 28;
+const TOTAL_RONDAS = 9;
+const TOTAL_EQUIPOS = 26;
 const SAVE_DEBOUNCE_MS = 350;
 const MAX_SCORE = 99.99;
 
 // ---------- Estado ----------
 const state = {
-  resultados: {},          // { ronda -> { partidoIdx -> [s1, s2] } }
+  resultados: {},          
   currentView: { type: "ronda", value: 1 },
   channelSubscribed: false,
-  pendingSaves: new Map(), // key -> { timer, payload }
+  pendingSaves: new Map(), 
   loaded: false,
 };
 
@@ -94,9 +95,9 @@ const applyRemoteChange = (payload) => {
     if (!state.resultados[r]) state.resultados[r] = {};
     state.resultados[r][row.partido_idx] = row.scores;
   }
-  // Re-render ONLY si la vista actual está afectada y nadie tiene foco en un input
+  
   const activeIsInput = document.activeElement && document.activeElement.tagName === "INPUT";
-  if (activeIsInput) return; // no rompemos la edición en curso
+  if (activeIsInput) return; 
   if (state.currentView.type === "ronda" && state.currentView.value.toString() === r) {
     renderRonda(state.currentView.value);
   } else if (state.currentView.type === "ranking") {
@@ -105,13 +106,10 @@ const applyRemoteChange = (payload) => {
 };
 
 const startApp = async () => {
-  // 1) Render INMEDIATO con datos vacíos para que la UI aparezca al instante
   initButtons();
   renderRonda(1);
-  // 2) En paralelo, intentamos cargar datos y suscribirnos
   try {
     await fetchResultados();
-    // Refrescamos la vista actual con los datos cargados
     if (state.currentView.type === "ronda") renderRonda(state.currentView.value);
     else renderClasificacion();
   } catch (err) {
@@ -122,7 +120,6 @@ const startApp = async () => {
 };
 
 const initAuth = async () => {
-  // Lanzamos el render primero (initAuth no bloquea la UI)
   startApp();
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -131,10 +128,6 @@ const initAuth = async () => {
     console.warn("[Machorras] Auth anónima falló, continuamos en modo lectura:", err?.message || err);
   }
 };
-
-// (initAuth() se invoca al final del script, cuando todas las constantes
-//  parejas / rondasData / NOMBRES_PISTAS ya están inicializadas. Hacerlo aquí
-//  causaría un ReferenceError por Temporal Dead Zone al renderRonda(1).)
 
 // ---------- Acciones expuestas ----------
 window.setCurrentView = (type, value) => {
@@ -154,7 +147,6 @@ window.saveScore = (ronda, partidoIdx, parejaPos, value) => {
   if (!state.resultados[rKey][partidoIdx]) state.resultados[rKey][partidoIdx] = [null, null];
   state.resultados[rKey][partidoIdx][parejaPos] = valFloat;
 
-  // Debounce write a Supabase
   const k = keyFor(ronda, partidoIdx);
   const prev = state.pendingSaves.get(k);
   if (prev?.timer) clearTimeout(prev.timer);
@@ -176,7 +168,7 @@ window.clearMatch = async (ronda, partidoIdx) => {
   const rKey = ronda.toString();
   if (!state.resultados[rKey]) state.resultados[rKey] = {};
   state.resultados[rKey][partidoIdx] = [null, null];
-  // Cancelamos cualquier save pendiente de ese partido
+  
   const k = keyFor(ronda, partidoIdx);
   const prev = state.pendingSaves.get(k);
   if (prev?.timer) clearTimeout(prev.timer);
@@ -192,38 +184,31 @@ window.clearMatch = async (ronda, partidoIdx) => {
   renderRonda(ronda);
 };
 
-// ---------- JUGADORAS (28) ----------
-const parejas = {
-  1: "Paula Avilés", 2: "Cristina", 3: "Adaya", 4: "M. Isabel Bonilla",
-  5: "Paula Alonso", 6: "Patricia Elzo", 7: "Elena Herrera", 8: "Silvia Pulido",
-  9: "Natalia Ferrarons", 10: "Marta Benítez", 11: "Caridad Martínez", 12: "Ana",
-  13: "Xelvi", 14: "Amalia", 15: "Helena Ortega", 16: "Paula Sanz",
-  17: "Maite", 18: "Rosi Medina", 19: "Sari Vera", 20: "Prado",
-  21: "Alba", 22: "María Suárez", 23: "Judith Ortega", 24: "Carla Glez",
-  25: "Aida", 26: "Alexia", 27: "Judit M.", 28: "Judit Duran"
+// ---------- EQUIPOS (26) ----------
+const equipos = {
+  1: "LAS REPES", 2: "MATCH Y CHISME", 3: "PELOTUDAS", 4: "ZIP ZAP",
+  5: "BOLBORETAS", 6: "ECLIPSE", 7: "KIWITERAS", 8: "LAS TWINS",
+  9: "SÍ A TODO", 10: "CRISTILI", 11: "LAS ENRALADAS", 12: "PAUSA",
+  13: "SIN PIEDAD", 14: "LA GRACIOSA", 15: "EQUIPAZO MG", 16: "LAS DIVAS",
+  17: "NO SMASH DÚO", 18: "TEAM MAD", 19: "LAS BAIFAS", 20: "LAS R&R",
+  21: "GOLPE CON MELODÍA", 22: "M&H", 23: "PA LAS RISAS", 24: "RESACÓN EN LA PISTA",
+  25: "VIR & JESS", 26: "KORA"
 };
 
-// ---------- 12 RONDAS OPTIMIZADAS (AMERICANO INDIVIDUAL) ----------
-// Schedule generado para minimizar repeticiones:
-//   - 0 parejas (compañeras) repetidas en todo el torneo
-//   - 17 pares de oponentes coinciden 2 veces (mínimo matemático con 12 rondas)
-// Formato: [j1, j2, j3, j4]  →  (j1 & j2)  vs  (j3 & j4)
+// ---------- 9 RONDAS (AMERICANO EQUIPOS) ----------
 const rondasData = {
-  1:  { cruces: [[24,27,12,11],[23,2,6,28],[20,14,10,18],[17,1,8,22],[7,13,21,15],[16,4,9,3],[25,26,19,5]] },
-  2:  { cruces: [[10,2,21,3],[16,20,6,12],[25,5,14,1],[7,4,22,17],[15,19,24,11],[18,9,8,13],[28,23,27,26]] },
-  3:  { cruces: [[22,6,27,13],[9,7,24,19],[14,3,20,11],[4,25,21,28],[26,2,17,18],[10,5,23,15],[1,8,12,16]] },
-  4:  { cruces: [[6,5,22,11],[7,25,26,20],[14,15,2,8],[24,12,13,4],[23,21,16,3],[17,9,18,28],[27,1,19,10]] },
-  5:  { cruces: [[2,28,10,13],[20,1,24,17],[21,22,11,9],[26,23,25,12],[16,15,19,18],[8,14,6,3],[4,27,5,7]] },
-  6:  { cruces: [[24,28,18,14],[25,15,9,27],[21,10,17,5],[11,8,26,12],[2,4,16,22],[20,7,1,23],[13,6,3,19]] },
-  7:  { cruces: [[5,28,7,24],[14,25,12,13],[16,19,22,10],[9,15,3,17],[27,8,21,20],[2,6,1,26],[4,23,11,18]] },
-  8:  { cruces: [[19,11,18,20],[9,28,1,5],[13,2,4,8],[15,7,14,12],[3,22,24,25],[21,17,23,6],[27,10,26,16]] },
-  9:  { cruces: [[15,26,1,21],[17,23,14,19],[16,2,5,20],[8,12,28,10],[24,13,11,25],[18,3,22,27],[4,9,6,7]] },
-  10: { cruces: [[23,16,13,15],[18,7,6,25],[9,21,12,20],[26,10,14,4],[22,19,28,3],[24,5,8,17],[11,27,2,1]] },
-  11: { cruces: [[11,23,16,8],[14,21,22,1],[12,5,17,19],[7,26,13,3],[10,4,18,25],[20,6,28,15],[9,24,27,2]] },
-  12: { cruces: [[12,18,5,3],[4,17,19,27],[2,7,8,23],[15,20,22,26],[16,21,14,24],[1,10,9,13],[6,11,28,25]] }
+  1: { cruces: [[1,2],[23,12],[3,24],[6,25],[8,16],[9,10],[4,11],[5,26],[14,7],[15,21],[17,18],[13,20],[22,19]] },
+  2: { cruces: [[1,24],[12,18],[13,23],[2,10],[3,9],[6,8],[25,16],[26,21],[7,4],[5,20],[11,17],[15,22],[14,19]] },
+  3: { cruces: [] }, 
+  4: { cruces: [] }, 
+  5: { cruces: [] }, 
+  6: { cruces: [] }, 
+  7: { cruces: [[13,7],[1,3],[2,25],[24,16],[6,10],[8,9],[4,26],[11,12],[5,21],[14,18],[15,20],[17,19],[23,22]] },
+  8: { cruces: [] }, 
+  9: { cruces: [] }  
 };
 
-const NOMBRES_PISTAS = ["20", "19", "18", "17", "16", "14", "13"];
+const NOMBRES_PISTAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"];
 
 // ---------- Render ----------
 function initButtons() {
@@ -255,6 +240,12 @@ function renderRonda(num) {
   const rKey = num.toString();
   const parts = [`<div class="animate-fade-in pb-10">`];
 
+  if (!data || !data.cruces || data.cruces.length === 0) {
+    container.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm mt-10">Enfrentamientos pendientes de cargar.</div>`;
+    updateNavUI(num);
+    return;
+  }
+
   data.cruces.forEach((cruce, idx) => {
     const mS = (state.resultados[rKey] && state.resultados[rKey][idx]) ? state.resultados[rKey][idx] : [null, null];
     const s1 = (mS[0] !== null && mS[0] !== undefined) ? mS[0] : "";
@@ -263,17 +254,23 @@ function renderRonda(num) {
 
     parts.push(`
       <div class="match-card">
-        <div class="flex justify-between items-center mb-5">
-            <span class="pista-label-pro">PISTA ${pistaReal}</span>
-            <button type="button" class="reset-btn" aria-label="Borrar resultado" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
+        <div class="match-header">
+            <span class="pista-label">PISTA ${pistaReal}</span>
+            <button type="button" class="reset-btn" aria-label="Borrar resultado" onclick="window.clearMatch(${num},${idx})">
+              Borrar
+            </button>
         </div>
-        <div class="flex items-center justify-between mb-4">
-          <span class="team-name">${escapeHtml(parejas[cruce[0]])} / ${escapeHtml(parejas[cruce[1]])}</span>
-          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 1" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
+        
+        <div class="team-row">
+          <span class="team-name">${escapeHtml(equipos[cruce[0]])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="0" aria-label="Puntos equipo A" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
         </div>
-        <div class="flex items-center justify-between">
-          <span class="team-name">${escapeHtml(parejas[cruce[2]])} / ${escapeHtml(parejas[cruce[3]])}</span>
-          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 2" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
+        
+        <div class="team-divider"></div>
+
+        <div class="team-row">
+          <span class="team-name">${escapeHtml(equipos[cruce[1]])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="0" aria-label="Puntos equipo B" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
         </div>
       </div>`);
   });
@@ -285,8 +282,8 @@ function renderRonda(num) {
 function renderClasificacion() {
   const container = document.getElementById("main-content");
   const stats = {};
-  for (let i = 1; i <= TOTAL_JUGADORAS; i++) {
-    stats[i] = { nombre: parejas[i], total: 0, jugados: 0 };
+  for (let i = 1; i <= TOTAL_EQUIPOS; i++) {
+    stats[i] = { nombre: equipos[i], total: 0, jugados: 0 };
   }
 
   for (const rKey of Object.keys(state.resultados)) {
@@ -297,25 +294,38 @@ function renderClasificacion() {
       if (!cruce) continue;
       const s = ronda[pIdx];
       if (!s) continue;
+      
       if (s[0] !== null && s[0] !== undefined) {
         stats[cruce[0]].total += s[0]; stats[cruce[0]].jugados++;
-        stats[cruce[1]].total += s[0]; stats[cruce[1]].jugados++;
       }
       if (s[1] !== null && s[1] !== undefined) {
-        stats[cruce[2]].total += s[1]; stats[cruce[2]].jugados++;
-        stats[cruce[3]].total += s[1]; stats[cruce[3]].jugados++;
+        stats[cruce[1]].total += s[1]; stats[cruce[1]].jugados++;
       }
     }
   }
 
   const sorted = Object.values(stats).sort((a, b) => b.total - a.total);
   const rows = sorted.map((p, i) => {
-    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1;
+    let positionClass = "rank-number";
+    if (i === 0) positionClass += " rank-gold";
+    if (i === 1) positionClass += " rank-silver";
+    if (i === 2) positionClass += " rank-bronze";
+    
     const puntosVisuales = p.total.toFixed(2).replace(".", ",");
-    return `<tr><td class="w-10 text-center font-black">${medal}</td><td class="font-bold text-sm uppercase"><span class="no-link">${escapeHtml(p.nombre)}</span></td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${puntosVisuales}</td></tr>`;
+    
+    return `
+      <div class="ranking-row">
+        <div class="${positionClass}">${i + 1}</div>
+        <div class="ranking-info">
+          <div class="ranking-name">${escapeHtml(p.nombre)}</div>
+          <div class="ranking-pj">${p.jugados} PJ</div>
+        </div>
+        <div class="ranking-pts">${puntosVisuales}</div>
+      </div>
+    `;
   }).join("");
 
-  container.innerHTML = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>JUGADORA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  container.innerHTML = `<div class="ranking-container animate-fade-in">${rows}</div>`;
   updateNavUI("ranking");
 }
 
@@ -325,74 +335,261 @@ function updateNavUI(active) {
   if (activeBtn) activeBtn.classList.add("active-ronda");
 }
 
-// ---------- Arranque ----------
-// Se invoca al final, cuando TODAS las constantes (parejas, rondasData,
-// NOMBRES_PISTAS) ya están inicializadas. De lo contrario el primer
-// renderRonda(1) lanzaría ReferenceError (TDZ) y la pantalla quedaría
-// sin partidos hasta que el usuario tocara una ronda.
 initAuth();
 </script>
 
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@900&family=Inter:wght@400;700;900&display=swap");
-
-* { text-decoration: none !important; -webkit-tap-highlight-color: transparent; }
-
+/* VARIABLES MINIMALISTAS */
 :root {
-    --green: #22c55e;
-    --dark-bg: #011a14;
-    --royal-pro-grad: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #111827 100%);
+    --bg-main: #F9FAFB;
+    --bg-card: #FFFFFF;
+    --text-dark: #111827;
+    --text-muted: #6B7280;
+    --text-light: #9CA3AF;
+    --accent: #000000;
+    --border: #E5E7EB;
+    --input-bg: #F3F4F6;
+    --radius-lg: 20px;
+    --radius-sm: 10px;
 }
 
-body { background: var(--dark-bg); color: white; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+* { 
+    text-decoration: none !important; 
+    -webkit-tap-highlight-color: transparent; 
+    box-sizing: border-box;
+}
 
-.header-main { background: radial-gradient(circle at top, #065f46 0%, #011a14 100%); padding: 4rem 1rem 3rem; text-align: center; }
+body { 
+    background: var(--bg-main); 
+    color: var(--text-dark); 
+    font-family: 'Inter', sans-serif; 
+    margin: 0; 
+    padding: 0; 
+    -webkit-font-smoothing: antialiased;
+}
+
+/* HEADER */
+.header-main { 
+    padding: 3rem 1.5rem 1.5rem; 
+    text-align: center; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
 
 .logo-box {
-    width: 120px; height: 120px; margin: 0 auto;
-    border-radius: 50%; border: 3px solid white;
-    overflow: hidden; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 30px rgba(34, 197, 94, 0.4); background: white;
+    width: 80px; 
+    height: 80px; 
+    margin-bottom: 1.2rem;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
 }
+
 .logo-box img {
-    width: 100%; height: 100%; object-fit: cover; object-position: center;
-    transform: scale(1.45);
+    width: 100%; 
+    height: 100%; 
+    object-fit: contain; 
 }
 
-.txt-green { color: var(--green); font-weight: 900; letter-spacing: 0.35em; font-size: 1rem; margin-top: 1.5rem; display: block; }
-.txt-logo { font-family: 'Fira Sans', sans-serif; font-size: 3.4rem; line-height: 0.8; margin-top: 0.4rem; text-shadow: 4px 4px 15px rgba(0,0,0,0.6); }
+.txt-subtitle { 
+    color: var(--text-muted); 
+    font-weight: 600; 
+    letter-spacing: 0.15em; 
+    font-size: 0.7rem; 
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
 
-.nav-box { position: sticky; top: 1rem; z-index: 100; margin: -1.5rem 1rem 2rem; background: rgba(1, 26, 20, 0.95); backdrop-filter: blur(20px); padding: 0.75rem; border-radius: 2rem; }
-.nav-scroll { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
+.txt-logo { 
+    font-weight: 800; 
+    font-size: 2rem; 
+    letter-spacing: -0.02em; 
+    color: var(--text-dark); 
+    margin: 0; 
+}
+
+/* NAVEGACIÓN */
+.nav-box { 
+    position: sticky; 
+    top: 1rem; 
+    z-index: 100; 
+    margin: 1rem 1rem 2rem; 
+    background: rgba(255, 255, 255, 0.85); 
+    backdrop-filter: blur(12px); 
+    -webkit-backdrop-filter: blur(12px);
+    padding: 0.5rem; 
+    border-radius: 100px; 
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+
+.nav-scroll { 
+    display: flex; 
+    gap: 0.25rem; 
+    overflow-x: auto; 
+    scrollbar-width: none; 
+}
 .nav-scroll::-webkit-scrollbar { display: none; }
 
-.btn-ronda-base { background: rgba(255,255,255,0.08); padding: 0.8rem 1.4rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: rgba(255,255,255,0.7); border: none; flex-shrink: 0; cursor: pointer; }
-.active-ronda { background: var(--green) !important; color: #000 !important; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.4); }
-
-.pista-label-pro { background: rgba(255,255,255,0.15); padding: 0.6rem 1.2rem; border-radius: 1.2rem; font-size: 11px; font-weight: 900; color: white; letter-spacing: 0.05em; }
-
-.match-card { background: var(--royal-pro-grad); border-radius: 1.8rem; padding: 1.6rem; margin-bottom: 1.4rem; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: none; }
-
-.team-name { font-size: 14px; font-weight: 700; color: white; letter-spacing: -0.01em; width: 70%; line-height: 1.2; }
-
-input {
-    width: 74px; height: 48px; background: white !important; color: #000 !important;
-    text-align: center; border-radius: 1rem; font-weight: 900; font-size: 24px; border: none;
-    text-shadow: 0.5px 0 0 #000, -0.5px 0 0 #000;
+.btn-ronda-base { 
+    background: transparent; 
+    padding: 0.7rem 1.2rem; 
+    border-radius: 100px; 
+    font-size: 13px; 
+    font-weight: 600; 
+    color: var(--text-muted); 
+    border: none; 
+    flex-shrink: 0; 
+    cursor: pointer; 
+    transition: all 0.2s ease;
 }
 
-.reset-btn { color: white; opacity: 0.3; font-size: 10px; font-weight: 900; border: none; background: transparent; cursor: pointer; }
+.active-ronda { 
+    background: var(--text-dark) !important; 
+    color: #FFFFFF !important; 
+}
 
-.ranking-container { background: var(--royal-pro-grad); border-radius: 1.8rem; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.4); margin-bottom: 2rem; }
-.ranking-container table { width: 100%; border-collapse: collapse; }
-.ranking-container td { padding: 20px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.ranking-container tr:last-child td { border-bottom: none; }
-.ranking-container th { padding: 15px; font-size: 10px; opacity: 0.5; letter-spacing: 0.2em; color: white; font-weight: 900; }
-.no-link { color: white !important; }
-.pts-cell { text-align: center !important; color: white !important; }
+/* MATCH CARDS */
+.match-card { 
+    background: var(--bg-card); 
+    border-radius: var(--radius-lg); 
+    padding: 1.5rem; 
+    margin-bottom: 1rem; 
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+}
 
-.animate-fade-in { animation: fadeIn 0.4s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.match-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 1.2rem;
+}
+
+.pista-label { 
+    background: var(--bg-main); 
+    padding: 0.4rem 0.8rem; 
+    border-radius: var(--radius-sm); 
+    font-size: 11px; 
+    font-weight: 700; 
+    color: var(--text-muted); 
+    letter-spacing: 0.05em; 
+    border: 1px solid var(--border);
+}
+
+.reset-btn { 
+    color: var(--text-light); 
+    font-size: 11px; 
+    font-weight: 600; 
+    border: none; 
+    background: transparent; 
+    cursor: pointer; 
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.team-row {
+    display: flex; 
+    items-center; justify-content: space-between; 
+    align-items: center;
+}
+
+.team-divider {
+    height: 1px;
+    background-color: var(--border);
+    margin: 1rem 0;
+}
+
+.team-name { 
+    font-size: 15px; 
+    font-weight: 600; 
+    color: var(--text-dark); 
+    width: 70%; 
+    line-height: 1.3; 
+}
+
+input {
+    width: 70px; 
+    height: 48px; 
+    background: var(--input-bg) !important; 
+    color: var(--text-dark) !important;
+    text-align: center; 
+    border-radius: var(--radius-sm); 
+    font-weight: 700; 
+    font-size: 20px; 
+    border: 1px solid transparent;
+    transition: border 0.2s;
+}
+
+input:focus {
+    outline: none;
+    border: 1px solid var(--text-dark);
+    background: var(--bg-card) !important;
+}
+
+/* RANKING */
+.ranking-container { 
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 2rem; 
+}
+
+.ranking-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.2rem;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+}
+
+.rank-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--input-bg);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    margin-right: 1rem;
+}
+
+.rank-gold { background: #FEF08A; color: #854D0E; }
+.rank-silver { background: #E5E7EB; color: #374151; }
+.rank-bronze { background: #FED7AA; color: #9A3412; }
+
+.ranking-info {
+    flex-grow: 1;
+}
+
+.ranking-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dark);
+    margin-bottom: 0.2rem;
+}
+
+.ranking-pj {
+    font-size: 11px;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.ranking-pts {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-dark);
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
@@ -400,13 +597,13 @@ input {
     <div class="logo-box">
       <img src="https://i.ibb.co/GfHXyzR0/copy-AD0111-D5-36-E9-4-C0-F-B82-F-97746173-E62-D.jpg" alt="Logo Machorras" onerror="this.style.display='none'">
     </div>
-    <span class="txt-green">AMERICANO</span>
-    <h1 class="txt-logo text-white">MACHORRAS</h1>
+    <span class="txt-subtitle">Americano</span>
+    <h1 class="txt-logo">Machorras</h1>
   </header>
 
   <nav class="nav-box" aria-label="Navegación de rondas">
     <div class="nav-scroll" id="buttons-rondas"></div>
-    <button type="button" onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-4 uppercase tracking-[0.2em]" aria-label="Ver ranking">Ranking</button>
+    <button type="button" onclick="window.setCurrentView('ranking')" id="btn-ranking" class="btn-ronda-base w-full mt-2 uppercase" aria-label="Ver ranking" style="border: 1px solid var(--border);">Clasificación</button>
   </nav>
 
   <main id="main-content" class="p-4"></main>
