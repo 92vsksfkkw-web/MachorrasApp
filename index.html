@@ -17,7 +17,8 @@
 <meta name="apple-mobile-web-app-title" content="Machorras">
 
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 
 <link rel="preconnect" href="https://sxtgzpzneqyaxljpkqmb.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -348,7 +349,9 @@ initAuth();
     --cream:         #E8E4CF;   /* Cream del logo */
     --cream-deep:    #D9D3B7;   /* Cream sombra */
     --paper:         #FAF8EC;   /* Papel para tarjetas, casi blanco */
-    --paper-edge:    rgba(14, 77, 42, 0.08);
+    --paper-edge:    rgba(14, 77, 42, 0.22);   /* Borde verde sutil pero visible (todas las cards) */
+    --border-soft:   rgba(14, 77, 42, 0.15);   /* Borde más ligero (nav, pista label) */
+    --border-strong: rgba(14, 77, 42, 0.30);   /* Borde marcado (inputs en foco, hovers) */
 
     --forest:        #0E4D2A;   /* Verde forest del logo */
     --forest-mid:    #1C6038;   /* Verde medio para hover */
@@ -402,7 +405,7 @@ body {
     display: flex; align-items: center; justify-content: center;
     background: var(--cream);
     box-shadow:
-        0 0 0 1px rgba(14, 77, 42, 0.12),
+        0 0 0 1.5px rgba(14, 77, 42, 0.35),
         0 22px 48px -16px rgba(7, 51, 27, 0.28),
         0 8px 18px -8px rgba(7, 51, 27, 0.16),
         inset 0 0 0 6px rgba(255, 255, 255, 0.4);
@@ -445,7 +448,7 @@ body {
     -webkit-backdrop-filter: saturate(160%) blur(18px);
     padding: 0.6rem;
     border-radius: 1.4rem;
-    border: 1px solid rgba(14, 77, 42, 0.08);
+    border: 1px solid var(--border-soft);
     box-shadow: var(--shadow-md);
 }
 .nav-scroll { display: flex; gap: 0.35rem; overflow-x: auto; scrollbar-width: none; }
@@ -490,11 +493,13 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.32em;
     font-weight: 800;
+    border: 1px solid var(--border-soft);
 }
-#btn-ranking:hover { background: rgba(14, 77, 42, 0.08); }
+#btn-ranking:hover { background: rgba(14, 77, 42, 0.08); border-color: var(--paper-edge); }
 #btn-ranking.active-ronda {
     background: var(--forest) !important;
     color: var(--cream) !important;
+    border-color: var(--forest) !important;
 }
 
 /* ── MATCH CARDS ── */
@@ -509,6 +514,7 @@ body {
     font-weight: 800;
     letter-spacing: 0.18em;
     text-transform: uppercase;
+    border: 1px solid var(--border-soft);
 }
 
 .match-card {
@@ -520,11 +526,12 @@ body {
     margin-bottom: 1.1rem;
     border: 1px solid var(--paper-edge);
     box-shadow: var(--shadow-md);
-    transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease);
+    transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), border-color 0.35s var(--ease-soft);
 }
 .match-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+    border-color: var(--border-strong);
 }
 
 .team-name {
@@ -546,10 +553,10 @@ input {
     border-radius: 0.85rem;
     font-weight: 900;
     font-size: 24px;
-    border: 1px solid rgba(14, 77, 42, 0.12) !important;
+    border: 1px solid var(--border-strong) !important;
     box-shadow: inset 0 1px 2px rgba(7, 51, 27, 0.05);
     transition: border-color 0.25s var(--ease-soft), box-shadow 0.25s var(--ease-soft), background 0.25s var(--ease-soft);
-    font-feature-settings: "tnum";  /* tabular numerals */
+    font-feature-settings: "tnum";
 }
 input::placeholder { color: rgba(14, 77, 42, 0.3); font-weight: 700; }
 input:focus {
@@ -587,7 +594,7 @@ input:focus {
 .ranking-container table { width: 100%; border-collapse: collapse; }
 .ranking-container td {
     padding: 18px 14px;
-    border-bottom: 1px solid rgba(14, 77, 42, 0.07);
+    border-bottom: 1px solid var(--border-soft);
     color: var(--forest);
 }
 .ranking-container tr:last-child td { border-bottom: none; }
