@@ -7,7 +7,7 @@
 <meta name="format-detection" content="address=no" />
 <meta name="format-detection" content="email=no" />
 <meta name="format-detection" content="date=no" />
-<meta name="description" content="Gestor en tiempo real del torneo Americano Machorras: 28 jugadoras, 12 rondas, ranking individual." />
+<meta name="description" content="Gestor en tiempo real del torneo Americano Machorras: 26 parejas, 9 rondas, ranking por parejas." />
 <meta name="theme-color" content="#011a14" />
 <title>Americano Machorras</title>
 
@@ -32,17 +32,17 @@ const supabaseAnonKey = "sb_publishable_mrrBNQvb9QKx4pfkSMoSuQ_IxtFSaaX";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ---------- Constantes torneo ----------
-const TOTAL_RONDAS = 12;
-const TOTAL_JUGADORAS = 28;
+const TOTAL_RONDAS = 9;
+const TOTAL_PAREJAS = 26;
 const SAVE_DEBOUNCE_MS = 350;
 const MAX_SCORE = 99.99;
 
 // ---------- Estado ----------
 const state = {
-  resultados: {},          // { ronda -> { partidoIdx -> [s1, s2] } }
+  resultados: {},          // { ronda -> { partidoIdx -> [scoreA, scoreB] } }
   currentView: { type: "ronda", value: 1 },
   channelSubscribed: false,
-  pendingSaves: new Map(), // key -> { timer, payload }
+  pendingSaves: new Map(),
   loaded: false,
 };
 
@@ -94,9 +94,9 @@ const applyRemoteChange = (payload) => {
     if (!state.resultados[r]) state.resultados[r] = {};
     state.resultados[r][row.partido_idx] = row.scores;
   }
-  // Re-render ONLY si la vista actual está afectada y nadie tiene foco en un input
+  // No re-renderizamos si hay un input enfocado (preserva la edición en curso)
   const activeIsInput = document.activeElement && document.activeElement.tagName === "INPUT";
-  if (activeIsInput) return; // no rompemos la edición en curso
+  if (activeIsInput) return;
   if (state.currentView.type === "ronda" && state.currentView.value.toString() === r) {
     renderRonda(state.currentView.value);
   } else if (state.currentView.type === "ranking") {
@@ -105,13 +105,12 @@ const applyRemoteChange = (payload) => {
 };
 
 const startApp = async () => {
-  // 1) Render INMEDIATO con datos vacíos para que la UI aparezca al instante
+  // 1) Render INMEDIATO con datos vacíos para UI instantánea
   initButtons();
   renderRonda(1);
-  // 2) En paralelo, intentamos cargar datos y suscribirnos
+  // 2) En paralelo: fetch y suscripción realtime
   try {
     await fetchResultados();
-    // Refrescamos la vista actual con los datos cargados
     if (state.currentView.type === "ronda") renderRonda(state.currentView.value);
     else renderClasificacion();
   } catch (err) {
@@ -122,7 +121,6 @@ const startApp = async () => {
 };
 
 const initAuth = async () => {
-  // Lanzamos el render primero (initAuth no bloquea la UI)
   startApp();
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -133,8 +131,8 @@ const initAuth = async () => {
 };
 
 // (initAuth() se invoca al final del script, cuando todas las constantes
-//  parejas / rondasData / NOMBRES_PISTAS ya están inicializadas. Hacerlo aquí
-//  causaría un ReferenceError por Temporal Dead Zone al renderRonda(1).)
+//  parejas / rondasData ya están inicializadas. Hacerlo antes causaría
+//  ReferenceError por Temporal Dead Zone.)
 
 // ---------- Acciones expuestas ----------
 window.setCurrentView = (type, value) => {
@@ -154,7 +152,6 @@ window.saveScore = (ronda, partidoIdx, parejaPos, value) => {
   if (!state.resultados[rKey][partidoIdx]) state.resultados[rKey][partidoIdx] = [null, null];
   state.resultados[rKey][partidoIdx][parejaPos] = valFloat;
 
-  // Debounce write a Supabase
   const k = keyFor(ronda, partidoIdx);
   const prev = state.pendingSaves.get(k);
   if (prev?.timer) clearTimeout(prev.timer);
@@ -176,7 +173,6 @@ window.clearMatch = async (ronda, partidoIdx) => {
   const rKey = ronda.toString();
   if (!state.resultados[rKey]) state.resultados[rKey] = {};
   state.resultados[rKey][partidoIdx] = [null, null];
-  // Cancelamos cualquier save pendiente de ese partido
   const k = keyFor(ronda, partidoIdx);
   const prev = state.pendingSaves.get(k);
   if (prev?.timer) clearTimeout(prev.timer);
@@ -192,38 +188,49 @@ window.clearMatch = async (ronda, partidoIdx) => {
   renderRonda(ronda);
 };
 
-// ---------- JUGADORAS (28) ----------
+// ---------- 26 PAREJAS ----------
 const parejas = {
-  1: "Paula Avilés", 2: "Cristina", 3: "Adaya", 4: "M. Isabel Bonilla",
-  5: "Paula Alonso", 6: "Patricia Elzo", 7: "Elena Herrera", 8: "Silvia Pulido",
-  9: "Natalia Ferrarons", 10: "Marta Benítez", 11: "Caridad Martínez", 12: "Ana",
-  13: "Xelvi", 14: "Amalia", 15: "Helena Ortega", 16: "Paula Sanz",
-  17: "Maite", 18: "Rosi Medina", 19: "Sari Vera", 20: "Prado",
-  21: "Alba", 22: "María Suárez", 23: "Judith Ortega", 24: "Carla Glez",
-  25: "Aida", 26: "Alexia", 27: "Judit M.", 28: "Judit Duran"
+  1:  "LAS REPES",
+  2:  "MATCH Y CHISME",
+  3:  "PA LAS RISAS",
+  4:  "PAUSA",
+  5:  "PELOTUDAS",
+  6:  "RESACÓN EN LA PISTA",
+  7:  "ECLIPSE",
+  8:  "VIR & JESS",
+  9:  "LAS TWINS",
+  10: "LAS DIVAS",
+  11: "SÍ A TODO",
+  12: "CRISTILI",
+  13: "ZIP ZAP",
+  14: "LAS ENRALADAS",
+  15: "BOLBORETAS",
+  16: "KORA",
+  17: "LA GRACIOSA",
+  18: "KIWITERAS",
+  19: "EQUIPAZO MG",
+  20: "GOLPE CON MELODÍA",
+  21: "NO SMASH DÚO",
+  22: "TEAM MAD",
+  23: "SIN PIEDAD",
+  24: "LAS R&R",
+  25: "M&H",
+  26: "LAS BAIFAS"
 };
 
-// ---------- 12 RONDAS OPTIMIZADAS (AMERICANO INDIVIDUAL) ----------
-// Schedule generado para minimizar repeticiones:
-//   - 0 parejas (compañeras) repetidas en todo el torneo
-//   - 17 pares de oponentes coinciden 2 veces (mínimo matemático con 12 rondas)
-// Formato: [j1, j2, j3, j4]  →  (j1 & j2)  vs  (j3 & j4)
+// ---------- 9 RONDAS · 13 PARTIDOS/RONDA (117 partidos únicos, 0 enfrentamientos repetidos) ----------
+// Formato: [pista, parejaA_id, parejaB_id]
 const rondasData = {
-  1:  { cruces: [[24,27,12,11],[23,2,6,28],[20,14,10,18],[17,1,8,22],[7,13,21,15],[16,4,9,3],[25,26,19,5]] },
-  2:  { cruces: [[10,2,21,3],[16,20,6,12],[25,5,14,1],[7,4,22,17],[15,19,24,11],[18,9,8,13],[28,23,27,26]] },
-  3:  { cruces: [[22,6,27,13],[9,7,24,19],[14,3,20,11],[4,25,21,28],[26,2,17,18],[10,5,23,15],[1,8,12,16]] },
-  4:  { cruces: [[6,5,22,11],[7,25,26,20],[14,15,2,8],[24,12,13,4],[23,21,16,3],[17,9,18,28],[27,1,19,10]] },
-  5:  { cruces: [[2,28,10,13],[20,1,24,17],[21,22,11,9],[26,23,25,12],[16,15,19,18],[8,14,6,3],[4,27,5,7]] },
-  6:  { cruces: [[24,28,18,14],[25,15,9,27],[21,10,17,5],[11,8,26,12],[2,4,16,22],[20,7,1,23],[13,6,3,19]] },
-  7:  { cruces: [[5,28,7,24],[14,25,12,13],[16,19,22,10],[9,15,3,17],[27,8,21,20],[2,6,1,26],[4,23,11,18]] },
-  8:  { cruces: [[19,11,18,20],[9,28,1,5],[13,2,4,8],[15,7,14,12],[3,22,24,25],[21,17,23,6],[27,10,26,16]] },
-  9:  { cruces: [[15,26,1,21],[17,23,14,19],[16,2,5,20],[8,12,28,10],[24,13,11,25],[18,3,22,27],[4,9,6,7]] },
-  10: { cruces: [[23,16,13,15],[18,7,6,25],[9,21,12,20],[26,10,14,4],[22,19,28,3],[24,5,8,17],[11,27,2,1]] },
-  11: { cruces: [[11,23,16,8],[14,21,22,1],[12,5,17,19],[7,26,13,3],[10,4,18,25],[20,6,28,15],[9,24,27,2]] },
-  12: { cruces: [[12,18,5,3],[4,17,19,27],[2,7,8,23],[15,20,22,26],[16,21,14,24],[1,10,9,13],[6,11,28,25]] }
+  1: { cruces: [[1,1,2],[2,3,4],[3,5,6],[4,7,8],[5,9,10],[6,11,12],[7,13,14],[8,15,16],[9,17,18],[10,19,20],[11,21,22],[12,23,24],[13,25,26]] },
+  2: { cruces: [[1,1,6],[2,4,22],[3,23,3],[4,2,12],[5,5,11],[6,7,9],[7,8,10],[8,16,20],[9,18,13],[10,15,24],[11,17,26],[12,19,25],[13,14,21]] },
+  3: { cruces: [[1,18,10],[2,1,8],[3,4,12],[4,6,11],[5,2,9],[6,5,7],[7,23,22],[8,13,20],[9,16,24],[10,14,26],[11,15,25],[12,17,3],[13,19,21]] },
+  4: { cruces: [[1,1,11],[2,12,9],[3,10,7],[4,8,5],[5,6,2],[6,4,13],[7,23,26],[8,24,25],[9,22,3],[10,20,21],[11,18,19],[12,16,17],[13,14,15]] },
+  5: { cruces: [[1,6,9],[2,8,12],[3,18,11],[4,1,10],[5,23,7],[6,2,5],[7,13,22],[8,20,24],[9,4,26],[10,16,25],[11,14,3],[12,15,21],[13,17,19]] },
+  6: { cruces: [[1,1,12],[2,10,11],[3,8,9],[4,6,7],[5,4,5],[6,23,2],[7,22,26],[8,13,24],[9,20,25],[10,18,3],[11,16,21],[12,14,19],[13,15,17]] },
+  7: { cruces: [[1,23,18],[2,1,5],[3,2,8],[4,6,10],[5,7,12],[6,9,11],[7,13,16],[8,14,4],[9,15,20],[10,17,22],[11,19,24],[12,21,26],[13,3,25]] },
+  8: { cruces: [[1,1,9],[2,11,7],[3,12,5],[4,10,2],[5,8,23],[6,18,6],[7,13,25],[8,26,3],[9,24,21],[10,22,19],[11,20,17],[12,4,15],[13,16,14]] },
+  9: { cruces: [[1,1,7],[2,9,5],[3,11,2],[4,12,6],[5,10,4],[6,8,18],[7,25,21],[8,13,3],[9,26,19],[10,24,17],[11,22,15],[12,20,14],[13,23,16]] }
 };
-
-const NOMBRES_PISTAS = ["20", "19", "18", "17", "16", "14", "13"];
 
 // ---------- Render ----------
 function initButtons() {
@@ -256,24 +263,24 @@ function renderRonda(num) {
   const parts = [`<div class="animate-fade-in pb-10">`];
 
   data.cruces.forEach((cruce, idx) => {
+    const [pista, parejaA_id, parejaB_id] = cruce;
     const mS = (state.resultados[rKey] && state.resultados[rKey][idx]) ? state.resultados[rKey][idx] : [null, null];
     const s1 = (mS[0] !== null && mS[0] !== undefined) ? mS[0] : "";
     const s2 = (mS[1] !== null && mS[1] !== undefined) ? mS[1] : "";
-    const pistaReal = NOMBRES_PISTAS[idx] || (idx + 1);
 
     parts.push(`
       <div class="match-card">
         <div class="flex justify-between items-center mb-5">
-            <span class="pista-label-pro">PISTA ${pistaReal}</span>
+            <span class="pista-label-pro">PISTA ${pista}</span>
             <button type="button" class="reset-btn" aria-label="Borrar resultado" onclick="window.clearMatch(${num},${idx})">BORRAR</button>
         </div>
         <div class="flex items-center justify-between mb-4">
-          <span class="team-name">${escapeHtml(parejas[cruce[0]])} / ${escapeHtml(parejas[cruce[1]])}</span>
-          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 1" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
+          <span class="team-name">${escapeHtml(parejas[parejaA_id])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos ${escapeHtml(parejas[parejaA_id])}" value="${s1}" oninput="window.saveScore(${num},${idx},0,this.value)">
         </div>
         <div class="flex items-center justify-between">
-          <span class="team-name">${escapeHtml(parejas[cruce[2]])} / ${escapeHtml(parejas[cruce[3]])}</span>
-          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos pareja 2" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
+          <span class="team-name">${escapeHtml(parejas[parejaB_id])}</span>
+          <input type="number" step="0.01" min="0" max="${MAX_SCORE}" inputmode="decimal" placeholder="-" aria-label="Puntos ${escapeHtml(parejas[parejaB_id])}" value="${s2}" oninput="window.saveScore(${num},${idx},1,this.value)">
         </div>
       </div>`);
   });
@@ -285,7 +292,7 @@ function renderRonda(num) {
 function renderClasificacion() {
   const container = document.getElementById("main-content");
   const stats = {};
-  for (let i = 1; i <= TOTAL_JUGADORAS; i++) {
+  for (let i = 1; i <= TOTAL_PAREJAS; i++) {
     stats[i] = { nombre: parejas[i], total: 0, jugados: 0 };
   }
 
@@ -295,15 +302,14 @@ function renderClasificacion() {
     for (const pIdx of Object.keys(ronda)) {
       const cruce = rondasData[rKey].cruces[pIdx];
       if (!cruce) continue;
+      const [, parejaA_id, parejaB_id] = cruce;
       const s = ronda[pIdx];
       if (!s) continue;
       if (s[0] !== null && s[0] !== undefined) {
-        stats[cruce[0]].total += s[0]; stats[cruce[0]].jugados++;
-        stats[cruce[1]].total += s[0]; stats[cruce[1]].jugados++;
+        stats[parejaA_id].total += s[0]; stats[parejaA_id].jugados++;
       }
       if (s[1] !== null && s[1] !== undefined) {
-        stats[cruce[2]].total += s[1]; stats[cruce[2]].jugados++;
-        stats[cruce[3]].total += s[1]; stats[cruce[3]].jugados++;
+        stats[parejaB_id].total += s[1]; stats[parejaB_id].jugados++;
       }
     }
   }
@@ -315,7 +321,7 @@ function renderClasificacion() {
     return `<tr><td class="w-10 text-center font-black">${medal}</td><td class="font-bold text-sm uppercase"><span class="no-link">${escapeHtml(p.nombre)}</span></td><td class="text-center opacity-40 text-xs">${p.jugados}</td><td class="text-center font-black text-white text-xl pts-cell">${puntosVisuales}</td></tr>`;
   }).join("");
 
-  container.innerHTML = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>JUGADORA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  container.innerHTML = `<div class="ranking-container animate-fade-in"><table><thead><tr><th>#</th><th>PAREJA</th><th>PJ</th><th class="text-center">PTS</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   updateNavUI("ranking");
 }
 
@@ -326,10 +332,7 @@ function updateNavUI(active) {
 }
 
 // ---------- Arranque ----------
-// Se invoca al final, cuando TODAS las constantes (parejas, rondasData,
-// NOMBRES_PISTAS) ya están inicializadas. De lo contrario el primer
-// renderRonda(1) lanzaría ReferenceError (TDZ) y la pantalla quedaría
-// sin partidos hasta que el usuario tocara una ronda.
+// Invocado al final, tras todas las declaraciones const, para evitar TDZ.
 initAuth();
 </script>
 
